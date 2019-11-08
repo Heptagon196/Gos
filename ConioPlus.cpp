@@ -8,23 +8,8 @@
 // void clearscreen(): 清屏
 // double gettime(): 获取时间，单位秒
 // int readkey(double limit_time): 获取用户在规定时间(单位秒)内按下的键，超时返回 0
+#include "ConioPlus.h"
 #if defined(linux) || defined(__APPLE__)
-
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <time.h>
-#include <cstdio>
-#include <cstdlib>
-
-const int BLACK = 0;
-const int BLUE  = 4;
-const int GREEN = 6;
-const int CYAN = 2;
-const int RED = 1;
-const int PURPLE = 5;
-const int YELLOW = 3;
-const int WHITE = 7;
 
 bool kbhit() {
 	struct termios oldt, newt;
@@ -89,19 +74,6 @@ void clearscreen() {
 }
 
 #else
-
-#include <conio.h>
-#include <windows.h>
-#include <time.h>
-
-const int BLACK = 0;
-const int BLUE = 9;
-const int GREEN = 10;
-const int CYAN = 11;
-const int RED = 12;
-const int PURPLE = 13;
-const int YELLOW = 14;
-const int WHITE = 15;
 
 #define __CONIOPLUS_COLOR(x, y) (x + 16 * y)
 

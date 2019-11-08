@@ -19,6 +19,9 @@ const int PURPLE = 5;
 const int YELLOW = 3;
 const int WHITE = 7;
 
+bool kbhit();
+int getch();
+
 #else
 
 #include <conio.h>
@@ -34,10 +37,11 @@ const int PURPLE = 13;
 const int YELLOW = 14;
 const int WHITE = 15;
 
+#define kbhit _kbhit
+#define getch _getch
+
 #endif
 
-bool kbhit();
-int getch();
 void gotoxy(int x, int y);
 void hidecursor();
 void showcursor();

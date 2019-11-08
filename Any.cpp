@@ -221,8 +221,7 @@ Any& Any::Assign(Any& val) {
         return *this;
     }
     if (val.x->type() == typeid(vector<Any>)) {
-        delete x;
-        x = new any(vector<Any>());
+        *x = any(vector<Any>());
         int len = val.GetSize();
         for (int i = 0; i < len; i ++) {
             PushBack(0);
