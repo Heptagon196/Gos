@@ -263,6 +263,9 @@ pair<int, string> get_token() {
     } else {
         ch = buffer;
         buffer = 0;
+        if (ch == ';') {
+            return {is_op, ";"};
+        }
     }
     string ans = "";
     RECHECK:;
@@ -280,6 +283,7 @@ pair<int, string> get_token() {
         type = is_op;
         if (ch == '}') {
             ch = ';';
+            return {is_op, "}"};
         } else {
             ch = fgetc(fp);
         }
@@ -449,9 +453,9 @@ class AST {
                         }
                     } else if (element.second == "if") {
                         if (node[0]->Run().Int()) {
-                            node[1]->Run();
+                            return node[1]->Run();
                         } else if (node.size() > 2) {
-                            node[2]->Run();
+                            return node[2]->Run();
                         }
                     } else if (element.second == "while") {
                         while (node[0]->Run().Int()) {
