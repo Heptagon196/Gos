@@ -1,0 +1,144 @@
+# 贪吃蛇
+N = 1000;
+W = 18;
+L = 38;
+prv = array(N);
+nxt = array(N);
+not_empty = array(L + 3, W + 3);
+x = array(N);
+y = array(N);
+t = 1;
+tail = 1;
+head = 1;
+cnt = 2;
+ch = 0;
+prv[head] = 0;
+nxt[head] = 0;
+x[1] = 2;
+y[1] = 2;
+foodx = 5;
+foody = 5;
+hidecursor();
+clearscreen();
+color(BLUE, BLUE);
+for (i = 1; i <= L + 2; i += 1) {
+    gotoxy(2 * i - 1, 1);
+    print("  ");
+    gotoxy(2 * i - 1, W + 2);
+    print("  ");
+}
+for (i = 1; i <= W + 2; i += 1) {
+    gotoxy(1, i);
+    print("  ");
+    gotoxy(2 * L + 3, i);
+    print("  ");
+}
+
+print_block = func(x, y, c) {
+    gotoxy(2 * x - 1, y);
+    color(c, c);
+    print("  ");
+}
+
+clear_block = func(x, y) {
+    gotoxy(2 * x - 1, y);
+    clearcolor();
+    print("  ");
+}
+
+print_block(5, 5, GREEN);
+print_block(2, 2, RED);
+not_empty[2, 2] = 1;
+while (true) {
+    ch = readkey(0.15f);
+    if (ch == "w" && t != 1) {
+        t = 0;
+    }
+    if (ch == "s" && t != 0) {
+        t = 1;
+    }
+    if (ch == "a" && t != 3) {
+        t = 2;
+    }
+    if (ch == "d" && t != 2) {
+        t = 3;
+    }
+    if (ch == "q") {
+        clear_block(1, 1);
+        println();
+        clearscreen();
+        showcursor();
+        println("Exited.");
+        exit(0);
+    }
+    if (ch == " ") {
+        while (getch() != " ") {
+        }
+    }
+    clear_block(x[tail], y[tail]);
+    tailx = x[tail];
+    taily = y[tail];
+    bakx = x[head];
+    baky = y[head];
+    if (t == 0) {
+        y[head] -= 1;
+    }
+    if (t == 1) {
+        y[head] += 1;
+    }
+    if (t == 2) {
+        x[head] -= 1;
+    }
+    if (t == 3) {
+        x[head] += 1;
+    }
+    if (x[head] <= 1 || x[head] >= L + 2 || y[head] <= 1 || y[head] >= W + 2 || not_empty[x[head], y[head]]) {
+        clear_block(1, 1);
+        println();
+        clearscreen();
+        showcursor();
+        println("Game Over!");
+        exit(0);
+    }
+    if (x[head] == foodx && y[head] == foody) {
+        print_block(tailx, taily, RED);
+        not_empty[tailx, taily] = 1;
+        x[cnt] = x[head];
+        y[cnt] = y[head];
+        x[head] = bakx;
+        y[head] = baky;
+        prv[head] = cnt;
+        prv[cnt] = 0;
+        nxt[cnt] = head;
+        head = cnt;
+        print_block(x[head], y[head], RED);
+        not_empty[x[head], y[head]] = 1;
+        cnt += 1;
+        while (true) {
+            foodx = randint(2, L + 2);
+            foody = randint(2, W + 2);
+            if (!not_empty[foodx, foody]) {
+                break;
+            }
+        }
+        print_block(foodx, foody, GREEN);
+    } else {
+        not_empty[tailx, taily] = 0;
+        if (tail != head) {
+            x[tail] = x[head];
+            y[tail] = y[head];
+            x[head] = bakx;
+            y[head] = baky;
+        }
+        nxt[prv[tail]] = 0;
+        prv[head] = tail;
+        nxt[tail] = head;
+        tmptail = prv[tail];
+        prv[tail] = 0;
+        head = tail;
+        tail = tmptail;
+        print_block(x[head], y[head], RED);
+        not_empty[x[head], y[head]] = 1;
+    }
+}
+return(0);

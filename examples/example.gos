@@ -1,0 +1,63 @@
+# This is a comment
+
+# Sum
+sum = 0;
+for (i = 0; i <= 100; i += 1) {
+    sum += i;
+}
+println("The sum from 1 to 100 is: ", sum);
+
+# Factorial
+fact = func(x) {
+    if (x == 0) {
+        return(1);
+    } else {
+        return(x * fact(x - 1));
+    }
+}
+println("10! = ", fact(10));
+
+# Prime numbers
+print("The prime numbers from 1 to 100 include: ");
+isprime = func(x) {
+    for (i = 2; i <= int(sqrt(float(x))); i += 1) {
+        if (x % i == 0) {
+            return(false);
+        }
+    }
+    return(true);
+}
+for (i = 2; i <= 100; i += 1) {
+    if (isprime(i)) {
+        print(i, " ");
+    }
+}
+println();
+
+# break and continue
+# Guess a number
+L = 1;
+R = 2047;
+ans = randint(L, R + 1);
+a = 0;
+println("Guess a number between ", L, " and ", R);
+println(ans);
+while (true) {
+    print("Input a number: ");
+    read(a);
+    if (!is_int(a)) {
+        println("It's not an integer!");
+        continue;
+    }
+    if (a > ans) {
+        print("It's too big. ");
+    } else if (a < ans) {
+        print("It's too small. ");
+    } else {
+        println("You are right!");
+        break;
+    }
+    println("Please try again.");
+}
+
+return(0);
