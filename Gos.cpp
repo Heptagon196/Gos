@@ -1,8 +1,9 @@
 #include "Gos.h"
 using namespace std;
 
+const string TypeName[] = {"vector", "string", "int", "double", "var", "func", "op"};
 ostream& operator << (ostream& fout, const pair<int, string>& x) {
-    fout << "|" << x.first << "|" << x.second << "|";
+    fout << "|" << TypeName[x.first] << "|" << x.second << "|";
     return fout;
 }
 
@@ -238,8 +239,6 @@ map<string, bool> keywords = {
     {"func", true},
 };
 
-bool end_of_file = false;
-
 const int is_vector = 0;
 const int is_string = 1;
 const int is_int = 2;
@@ -282,7 +281,7 @@ pair<int, string> get_token() {
     if (ch == '(' || ch == ')' || ch == '[' || ch == ']' || ch == '{' || ch == '}') {
         type = is_op;
         if (ch == '}') {
-            ch = ';';
+            buffer = ';';
             return {is_op, "}"};
         } else {
             ch = fgetc(fp);
@@ -357,16 +356,11 @@ pair<int, string> get_token() {
         while (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
             ch = fgetc(fp);
         }
-        if (ch == EOF) {
-            end_of_file = true;
-        } else {
+        if (ch != EOF) {
             buffer = ch;
         }
-    } else {
-        end_of_file = true;
     }
     last_token_type = type;
-    //cout << "Token: " << type << " |" << ans << "|" << endl;
     return {type, ans};
 }
 
@@ -763,8 +757,12 @@ int Gos::RunGos(char filename[]) {
     }
     srand(time(NULL));
     stack<pair<int, string>> result, tmp, orig;
-    while (!end_of_file) {
-        orig.push(get_token());
+    while (true) {
+        auto i = get_token();
+        if (i.second.length() > 0 && i.second[0] == EOF) {
+            break;
+        }
+        orig.push(i);
     }
     //tmp.push({is_func, "_"});
     while (!orig.empty()) {
