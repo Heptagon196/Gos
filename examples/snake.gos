@@ -51,6 +51,7 @@ print_block(5, 5, GREEN);
 print_block(2, 2, RED);
 not_empty[2, 2] = 1;
 while (true) {
+    gotoxy(1, 21);
     ch = readkey(0.15f);
     if (ch == "w" && t != 1) {
         t = 0;
