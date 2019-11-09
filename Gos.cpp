@@ -226,6 +226,15 @@ map<string, function<Any(vector<Any>)>> funcs = {
         break_out = true;
         return nullptr;
     }},
+    {"substr", Func {
+        if (args.size() == 2) {
+            return args[0].cast<string>()->substr(args[1].Int(), 1);
+        }
+        return args[0].cast<string>()->substr(args[1].Int(), args[2].Int());
+    }},
+    {"strlen", Func {
+        return (int)args[0].cast<string>()->length();
+    }},
     {"exit", Func {
         exit(args[0].Int());
     }},
