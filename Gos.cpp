@@ -14,6 +14,8 @@ bool break_out = false;
 bool exit_func = false;
 Any exit_value = nullptr;
 
+string this_refers_to = "";
+
 FILE *fp;
 
 map<char, char> conv = {
@@ -78,6 +80,20 @@ map<string, function<Any(vector<Any>)>> funcs = {
     {"array", Func {
         return Any(0).Repeat(args);
     }},
+    {"list", Func {
+        vector<Any> ret(args.size());
+        for (int i = 0; i < args.size(); i ++) {
+            ret[i].Assign(args[i]);
+        }
+        return ret;
+    }},
+    {"struct", Func {
+        map<string, Any> ret;
+        for (int i = 0; i < args.size(); i ++) {
+            ret[*args[i].cast<string>()] = 0;
+        }
+        return ret;
+    }},
     {"sin", Func { return sin(args[0].Double()); }},
     {"cos", Func { return cos(args[0].Double()); }},
     {"tan", Func { return tan(args[0].Double()); }},
@@ -102,7 +118,7 @@ map<string, function<Any(vector<Any>)>> funcs = {
     }},
     {"_", Func {
         if (args.size() == 0) {
-            return nullptr;
+            return 0;
         }
         return args[args.size() - 1];
     }},
@@ -150,7 +166,8 @@ map<string, function<Any(vector<Any>)>> funcs = {
     }},
     {"push", Func {
         for (int i = 1; i < args.size(); i ++) {
-            args[0].PushBack(args[1]);
+            args[0].PushBack(0);
+            args[0][args[0].GetSize() - 1].Assign(args[i]);
         }
         return nullptr;
     }},
@@ -254,6 +271,7 @@ bool is_constant(int x) {
 #define is_left_brace(s) ((s) == "(" || (s) == "[" || (s) == "{")
 #define is_right_brace(s) ((s) == ")" || (s) == "]" || (s) == "}")
 
+bool conv_to_string = false;
 pair<int, string> get_token() {
     static int last_token_type = -1;
     int ch, type;
@@ -264,6 +282,10 @@ pair<int, string> get_token() {
         buffer = 0;
         if (ch == ';') {
             return {is_op, ";"};
+        }
+        if (ch == '.') {
+            conv_to_string = true;
+            return {is_op, "."};
         }
     }
     string ans = "";
@@ -282,7 +304,7 @@ pair<int, string> get_token() {
         type = is_op;
         if (ch == '}') {
             buffer = ';';
-            return {is_op, "}"};
+            return {last_token_type = is_op, "}"};
         } else {
             ch = fgetc(fp);
         }
@@ -328,13 +350,27 @@ pair<int, string> get_token() {
         while (isalpha(ch = fgetc(fp)) || ch == '_') {
             ans += ch;
         }
-        while(ch == ' ') {
+        while (ch == ' ') {
             ch = fgetc(fp);
         }
         if (ch != '(' && ch != '[' && ch != '{') {
             type = is_var;
+            if (ch == '.') {
+                buffer = '.';
+                return {last_token_type = type, ans};
+            }
+            if (conv_to_string) {
+                conv_to_string = false;
+                type = is_string;
+            }
         } else {
-            ch = fgetc(fp);
+            //if (conv_to_string) {
+                //conv_to_string = false;
+                //buffer = ch;
+                //return {last_token_type = is_string, ans};
+            //} else {
+                ch = fgetc(fp);
+            //}
         }
     } else {
         type = is_op;
@@ -471,8 +507,14 @@ class AST {
                     return nullptr;
                 } else {
                     vector<Any> args;
-                    for (auto& x : node) {
-                        args.push_back(x->Run());
+                    if (element.second != ".") {
+                        for (auto& x : node) {
+                            args.push_back(x->Run());
+                        }
+                    } else {
+                        for (auto& x : node[1]->node) {
+                            args.push_back(x->Run());
+                        }
                     }
                     return f(args);
                 }
@@ -512,33 +554,59 @@ class AST {
             if (keywords[element.second]) {
                 return nullptr;
             }
+            if (element.second == ".") {
+                Any& f = (*getVar(node[0]->element.second == "this" ? this_refers_to : node[0]->element.second).cast<map<string, Any>>())[node[1]->element.second];
+                if (node[1]->element.first == is_string) {
+                    return [&](vector<Any> args) -> Any {
+                        return f;
+                    };
+                } else {
+                    return [&](vector<Any> args) -> Any {
+                        string tmp = this_refers_to;
+                        this_refers_to = node[0]->element.second;
+                        vector<Any>& vec = f.cast<GosFunc>()->f;
+                        AST *rt = f.cast<GosFunc>()->rt;
+#define CallFunction()                                              \
+                        vector<Any> bakvec(vec.size());             \
+                        for (int i = 0; i < vec.size(); i ++) {     \
+                            bakvec[i].Assign(vec[i]);               \
+                            vec[i].Assign(args[i]);                 \
+                        }                                           \
+                        Any ret = rt->Run();                        \
+                        for (int i = 0; i < vec.size(); i ++) {     \
+                            vec[i].Assign(bakvec[i]);               \
+                        }                                           \
+                        return ret;
+                        CallFunction();
+                        this_refers_to = tmp;
+                    };
+                }
+            }
             //cout << "Calling function " << element.second << endl;
             if (funcs.find(element.second) == funcs.end()) {
                 Any &f = getVar(element.second);
-                if (f.GetType() == typeid(vector<Any>)) {
+                if (f.GetType() == typeid(map<string, Any>)) {
+                    return [&](vector<Any> args) -> Any {
+                        vector<Any>& vec = (*f.cast<map<string, Any>>())["at"].cast<GosFunc>()->f;
+                        AST *rt = (*f.cast<map<string, Any>>())["at"].cast<GosFunc>()->rt;
+                        CallFunction();
+                    };
+                } else if (f.GetType() == typeid(vector<Any>)) {
                     return [&](vector<Any> args) -> Any {
                         return f[args];
                     };
                 } else if (f.GetType() == typeid(GosFunc)) {
                     return [&](vector<Any> args) -> Any {
                         vector<Any>& vec = f.cast<GosFunc>()->f;
-                        AST* rt = f.cast<GosFunc>()->rt;
-                        vector<Any> bakvec(vec.size());
-                        for (int i = 0; i < vec.size(); i ++) {
-                            bakvec[i].Assign(vec[i]);
-                            vec[i].Assign(args[i]);
-                        }
-                        Any ret = rt->Run();
-                        for (int i = 0; i < vec.size(); i ++) {
-                            vec[i].Assign(bakvec[i]);
-                        }
-                        return ret;
+                        AST *rt = f.cast<GosFunc>()->rt;
+                        CallFunction();
                     };
                 }
                 Error("Unknown function: " + element.second);
             }
             return funcs[element.second];
         }
+#undef CallFunction
         void print(int dep) {
 #define indent()                                \
             for (int i = 0; i < dep; ++ i) {    \
@@ -668,6 +736,7 @@ map<string, int> priority = {
     {"%", 9},
     {"!", 10},
     {"~", 10},
+    {".", 11},
 };
 
 AST* root = new AST({is_func, "_"});

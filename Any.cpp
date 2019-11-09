@@ -106,7 +106,7 @@ const type_info& Any::GetType() {
     return x->type();
 }
 
-const bool Any::operator == (const Any& val) {
+const bool Any::operator == (const Any& val) const {
     if (x->type() != val.x->type()) {
         return false;
     }
@@ -126,11 +126,11 @@ const bool Any::operator == (const Any& val) {
     return true;
 }
 
-const bool Any::operator != (const Any& val) {
+const bool Any::operator != (const Any& val) const {
     return !(*this == val);
 }
 
-const bool Any::operator < (const Any& val) {
+const bool Any::operator < (const Any& val) const {
     if (x->type() != val.x->type()) {
         Warning((string)"Unable to compare: " + (string)x->type().name() + (string)" and " + (string)val.x->type().name());
         return false;
@@ -151,19 +151,19 @@ const bool Any::operator < (const Any& val) {
     }
 }
 
-const bool Any::operator <= (const Any& val) {
+const bool Any::operator <= (const Any& val) const {
     return (*this < val) || (*this == val);
 }
 
-const bool Any::operator >= (const Any& val) {
+const bool Any::operator >= (const Any& val) const {
     return !(*this < val);
 }
 
-const bool Any::operator > (const Any& val) {
+const bool Any::operator > (const Any& val) const {
     return !(*this <= val);
 }
 
-Any Any::operator + (const Any& val) {
+Any Any::operator + (const Any& val) const {
     if (x->type() != val.x->type()) {
         Warning((string)"Unable to calculate: " + (string)x->type().name() + (string)" + " + (string)val.x->type().name());
         return 0;
@@ -184,7 +184,7 @@ Any Any::operator + (const Any& val) {
 }
 
 #define DefOp(op, opstr)\
-Any Any::operator op (const Any& val) {\
+Any Any::operator op (const Any& val) const {\
     if (x->type() != val.x->type()) {\
         Warning((string)"Unable to calculate: " + (string)x->type().name() + " " + (string)opstr + " " + (string)val.x->type().name());\
         return 0;\
@@ -220,7 +220,15 @@ Any& Any::Assign(Any& val) {
         Warning("Unable to change a const");
         return *this;
     }
-    if (val.x->type() == typeid(vector<Any>)) {
+    if (val.x->type() == typeid(map<string, Any>)) {
+        *x = any(map<string, Any>());
+        map<string, Any>& cur = *this->cast<map<string, Any>>();
+        map<string, Any>& other = *val.cast<map<string, Any>>();
+        for (auto& x : other) {
+            cur[x.first] = 0;
+            cur[x.first].Assign(x.second);
+        }
+    } else if (val.x->type() == typeid(vector<Any>)) {
         *x = any(vector<Any>());
         int len = val.GetSize();
         for (int i = 0; i < len; i ++) {

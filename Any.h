@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <map>
 #include <functional>
 #include "Error.h"
 using namespace std;
@@ -33,16 +34,16 @@ class Any {
         function<void(vector<Any*>)> Func() const;
         int Int() const;
         double Double() const;
-        const bool operator == (const Any& val);
-        const bool operator != (const Any& val);
-        const bool operator < (const Any& val);
-        const bool operator > (const Any& val);
-        const bool operator <= (const Any& val);
-        const bool operator >= (const Any& val);
-        Any operator + (const Any& val);
-        Any operator - (const Any& val);
-        Any operator * (const Any& val);
-        Any operator / (const Any& val);
+        const bool operator == (const Any& val) const;
+        const bool operator != (const Any& val) const;
+        const bool operator < (const Any& val) const;
+        const bool operator > (const Any& val) const;
+        const bool operator <= (const Any& val) const;
+        const bool operator >= (const Any& val) const;
+        Any operator + (const Any& val) const;
+        Any operator - (const Any& val) const;
+        Any operator * (const Any& val) const;
+        Any operator / (const Any& val) const;
         Any Pow(const Any& val);
         Any& Assign(Any& val);
         Any& LinkTo(Any& val);

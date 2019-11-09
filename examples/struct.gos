@@ -1,0 +1,14 @@
+#!/usr/bin/env gos
+Box = struct();
+    Box.length = 0;
+    Box.breadth = 0;
+    Box.height = 0;
+    Box.read = func() {
+        read(this.length, this.breadth, this.height);
+    }
+    Box.getVolume = func() {
+        return(this.length * this.breadth * this.height);
+    }
+x = Box;
+x.read();
+println(x.getVolume());
