@@ -16,8 +16,6 @@ Any exit_value = nullptr;
 
 string this_refers_to = "";
 
-FILE *fp;
-
 map<char, char> conv = {
     {'n', '\n'},
     {'r', '\r'},
@@ -280,10 +278,12 @@ bool is_constant(int x) {
 #define is_left_brace(s) ((s) == "(" || (s) == "[" || (s) == "{")
 #define is_right_brace(s) ((s) == ")" || (s) == "]" || (s) == "}")
 
+stack<FILE*> fps;
 bool conv_to_string = false;
 pair<int, string> get_token() {
     static int last_token_type = -1;
     int ch, type;
+    FILE *fp = fps.top();
     if (buffer == 0) {
         ch = fgetc(fp);
     } else {
@@ -303,8 +303,27 @@ pair<int, string> get_token() {
         ch = fgetc(fp);
     }
     if (ch == '#') {
+        string command = "";
+        string argument = "";
+        string *cur = &command;
         while (ch != '\n') {
             ch = fgetc(fp);
+            if (ch == ' ') {
+                cur = &argument;
+                continue;
+            }
+            if (ch != '\n') {
+                cur->push_back(ch);
+            }
+        }
+        if (command.length() > 0 && command[0] == '#') {
+            if (command == "#include") {
+                fps.push(fopen(argument.c_str(), "r"));
+                if (fps.top() == NULL) {
+                    Error("Unknown file: " + argument);
+                }
+                return get_token();
+            }
         }
         goto RECHECK;
     }
@@ -829,16 +848,24 @@ Any& Gos::GetVar(string name) {
 
 int Gos::RunGos(char filename[]) {
     if (filename != nullptr && strlen(filename) != 0) {
-        fp = fopen(filename, "r");
+        fps.push(fopen(filename, "r"));
+        if (fps.top() == NULL) {
+            Error("Unknown file: " + (string)filename);
+        }
     } else {
-        fp = stdin;
+        fps.push(stdin);
     }
     srand(time(NULL));
     stack<pair<int, string>> result, tmp, orig;
     while (true) {
         auto i = get_token();
         if (i.second.length() > 0 && i.second[0] == EOF) {
-            break;
+            fps.pop();
+            if (fps.empty()) {
+                break;
+            } else {
+                continue;
+            }
         }
         orig.push(i);
     }

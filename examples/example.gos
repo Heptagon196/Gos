@@ -61,5 +61,5 @@ while (true) {
     }
     println("Please try again.");
 }
-
+##include snake.gos
 return(0);
