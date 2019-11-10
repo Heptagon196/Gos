@@ -10,14 +10,16 @@
 #include <map>
 #include <set>
 #include <functional>
+#include <fstream>
 #include "Any.h"
 namespace Gos {
     void ClearGos();
-    void ImportConioLib();
+    void ImportDefaultLib();
     void ImportConst(map<string, Any> consts);
     void ImportVar(map<string, Any> vars);
     void ImportFunc(map<string, function<Any(vector<Any>)>> func);
     Any& GetVar(string name);
-    int RunGos(char filename[]);
+    Any ExecuteFunc(Any func, vector<Any> args);
+    Any BuildGos(const char filename[]);
 }
 #endif

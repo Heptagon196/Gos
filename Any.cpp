@@ -100,6 +100,7 @@ Type Any::FuncName() const {                        \
 DefGet(Function, Func, "function")
 DefGet(int, Int, "integer");
 DefGet(double, Double, "double");
+DefGet(string, String, "string");
 #undef DefGet
 
 const type_info& Any::GetType() {
@@ -229,7 +230,7 @@ Any& Any::Assign(Any& val) {
             cur[x.first].Assign(x.second);
         }
     } else if (val.x->type() == typeid(vector<Any>)) {
-        *x = any(vector<Any>());
+        *x = vector<Any>();
         int len = val.GetSize();
         for (int i = 0; i < len; i ++) {
             PushBack(0);
@@ -247,10 +248,6 @@ Any& Any::LinkTo(Any& val) {
         Warning("Unable to change a const");
         return *this;
     }
-    if (!islink) {
-        delete x;
-    }
-    islink = true;
     x = val.x;
     isconst = val.isconst;
     return *this;
@@ -262,28 +259,28 @@ void Any::PushBack(Any val) {
     if (x->type() != typeid(vector<Any>)) {
         Error("Not a vector.");
     }
-    any_cast<vector<Any>>(x)->push_back(val);
+    cast<vector<Any>>()->push_back(val);
 }
 
 void Any::PopBack() {
     if (x->type() != typeid(vector<Any>)) {
         Error("Not a vector.");
     }
-    any_cast<vector<Any>>(x)->pop_back();
+    cast<vector<Any>>()->pop_back();
 }
 
 int Any::GetSize() const {
     if (x->type() != typeid(vector<Any>)) {
         Error("Not a vector.");
     }
-    return any_cast<vector<Any>>(x)->size();
+    return any_cast<vector<Any>>(*x).size();
 }
 
 Any& Any::operator [] (const int& id) {
     if (x->type() != typeid(vector<Any>)) {
         Error("Not a vector.");
     }
-    return (*any_cast<vector<Any>>(x))[id];
+    return (*cast<vector<Any>>())[id];
 }
 
 Any& Any::operator [] (const vector<Any>& ids) {
@@ -292,7 +289,7 @@ Any& Any::operator [] (const vector<Any>& ids) {
         if (ans->x->type() != typeid(vector<Any>)) {
             Error("Not a vector.");
         }
-        ans = &(*any_cast<vector<Any>>(ans->x))[ids[i].Int()];
+        ans = &(*ans->cast<vector<Any>>())[ids[i].Int()];
     }
     return *ans;
 }

@@ -44,13 +44,12 @@ ans = randint(L, R + 1);
 a = 0;
 println("Guess a number between ", L, " and ", R);
 println(ans);
+# include a script
+##include getvar.gos
 while (true) {
-    print("Input a number: ");
-    read(a);
-    if (!is_int(a)) {
-        println("It's not an integer!");
-        continue;
-    }
+    a = getvar.getInt();
+    #getvar.getInt();
+    #a = getvar();
     if (a > ans) {
         print("It's too big. ");
     } else if (a < ans) {
@@ -61,5 +60,9 @@ while (true) {
     }
     println("Please try again.");
 }
-##include snake.gos
+println("Press space to play the game 'snake'");
+while ((getch()) != " ") {
+}
+# executing a script
+exec("snake.gos");
 return(0);

@@ -71,7 +71,7 @@ while (true) {
         clearscreen();
         showcursor();
         println("Exited.");
-        exit(0);
+        return(0);
     }
     if (ch == " ") {
         while (getch() != " ") {
@@ -100,7 +100,7 @@ while (true) {
         clearscreen();
         showcursor();
         println("Game Over!");
-        exit(0);
+        return(0);
     }
     if (x[head] == foodx && y[head] == foody) {
         print_block(tailx, taily, RED);

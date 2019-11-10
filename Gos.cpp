@@ -16,6 +16,11 @@ Any exit_value = nullptr;
 
 string this_refers_to = "";
 
+static streambuf *InBuf = cin.rdbuf();
+static streambuf *OutBuf = cout.rdbuf();
+ifstream fin;
+ofstream fout;
+
 map<char, char> conv = {
     {'n', '\n'},
     {'r', '\r'},
@@ -65,6 +70,7 @@ map<char, char> conv = {
     }                                               \
 
 #define Func [](vector<Any> args) -> Any
+
 map<string, function<Any(vector<Any>)>> funcs = {
     {"int", Func { return int(args[0].Double()); }},
     {"float", Func { return double(args[0].Int()); }},
@@ -72,7 +78,10 @@ map<string, function<Any(vector<Any>)>> funcs = {
         stringstream ss;
         string out;
         ss << args[0];
-        ss >> out;
+        getline(ss, out);
+        if (out[out.length() - 1] == '\n') {
+            return out.substr(0, out.length() - 1);
+        }
         return out;
     }},
     {"array", Func {
@@ -197,10 +206,27 @@ map<string, function<Any(vector<Any>)>> funcs = {
         return nullptr;
     }},
     {"read", Func {
+        int ret = 0;
         for (auto& x : args) {
-            cin >> x;
+            ret = (cin >> x) ? 1 : 0;
         }
-        return nullptr;
+        return ret;
+    }},
+    {"getline", Func {
+        string s;
+        int ret = getline(cin, s) ? 1 : 0;
+        Any tmp = s;
+        args[0].Assign(tmp);
+        return ret;
+    }},
+    {"getchar", Func {
+        string tmp;
+        char ch;
+        if (!cin.read(&ch, 1)) {
+            return -1;
+        }
+        tmp.push_back(ch);
+        return tmp;
     }},
     {"randint", Func {
         int L = args[0].Int();
@@ -253,6 +279,35 @@ map<string, function<Any(vector<Any>)>> funcs = {
     }},
     {"time", Func {
         return gettime();
+    }},
+    {"system", Func {
+        return (int)system(args[0].String().c_str());
+    }},
+    {"read_from", Func {
+        if (args[0].String() == "/dev/stdin") {
+            fin.close();
+            cin.rdbuf(InBuf);
+            return 1;
+        }
+        fin.open(args[0].String());
+        if (!fin) {
+            return 0;
+        }
+        cin.rdbuf(fin.rdbuf());
+        return 1;
+    }},
+    {"print_to", Func {
+        if (args[0].String() == "/dev/stdout") {
+            fout.close();
+            cout.rdbuf(OutBuf);
+            return 1;
+        }
+        fout.open(args[0].String());
+        if (!fout) {
+            return 0;
+        }
+        cout.rdbuf(fout.rdbuf());
+        return 1;
     }},
 };
 
@@ -332,6 +387,7 @@ pair<int, string> get_token() {
         type = is_op;
         if (ch == '}') {
             buffer = ';';
+            conv_to_string = false;
             return {last_token_type = is_op, "}"};
         } else {
             ch = fgetc(fp);
@@ -375,7 +431,7 @@ pair<int, string> get_token() {
         }
     } else if (isalpha(ch)) {
         type = is_func;
-        while (isalpha(ch = fgetc(fp)) || ch == '_') {
+        while (isalpha(ch = fgetc(fp)) || isdigit(ch) || ch == '_') {
             ans += ch;
         }
         while (ch == ' ') {
@@ -385,6 +441,7 @@ pair<int, string> get_token() {
             type = is_var;
             if (ch == '.') {
                 buffer = '.';
+                conv_to_string = false;
                 return {last_token_type = type, ans};
             }
             if (conv_to_string) {
@@ -392,13 +449,7 @@ pair<int, string> get_token() {
                 type = is_string;
             }
         } else {
-            //if (conv_to_string) {
-                //conv_to_string = false;
-                //buffer = ch;
-                //return {last_token_type = is_string, ans};
-            //} else {
-                ch = fgetc(fp);
-            //}
+            ch = fgetc(fp);
         }
     } else {
         type = is_op;
@@ -424,6 +475,7 @@ pair<int, string> get_token() {
             buffer = ch;
         }
     }
+    conv_to_string = false;
     last_token_type = type;
     return {type, ans};
 }
@@ -436,11 +488,6 @@ class AST {
         AST* fa = this;
         //AST* lastif;
         bool endpoint = false;
-
-        struct GosFunc {
-            vector<Any> f;
-            AST* rt;
-        };
 
         AST() {}
         AST(const pair<int, string>& element) : element(element) {}
@@ -483,76 +530,6 @@ class AST {
             cur->var[name] = 0;
             return cur->var[name];
         }
-        Any Run() {
-            if (exit_func) {
-                if (endpoint) {
-                    exit_func = false;
-                    if (!(element.first == is_op && element.second == "return")) {
-                        return exit_value;
-                    }
-                } else {
-                    return nullptr;
-                }
-            }
-            if (skip_rest) {
-                return nullptr;
-            }
-            if (element.first == is_func || element.first == is_op) {
-                auto f = getFunc();
-                if (f == nullptr) {
-                    if (element.second == "for") {
-                        for (node[0]->Run(); node[1]->Run().Int(); node[2]->Run()) {
-                            node[3]->Run();
-                            skip_rest = false;
-                            if (break_out || exit_func) {
-                                break_out = false;
-                                break;
-                            }
-                        }
-                    } else if (element.second == "if") {
-                        if (node[0]->Run().Int()) {
-                            return node[1]->Run();
-                        } else if (node.size() > 2) {
-                            return node[2]->Run();
-                        }
-                    } else if (element.second == "while") {
-                        while (node[0]->Run().Int()) {
-                            node[1]->Run();
-                            skip_rest = false;
-                            if (break_out || exit_func) {
-                                break_out = false;
-                                break;
-                            }
-                        }
-                    } else if (element.second == "func") {
-                        GosFunc f;
-                        for (int i = 0; i < node.size() - 1; i ++) {
-                            f.f.push_back(var[node[i]->element.second]);
-                        }
-                        f.rt = last();
-                        return f;
-                    }
-                    return nullptr;
-                } else {
-                    vector<Any> args;
-                    if (element.second != ".") {
-                        for (auto& x : node) {
-                            args.push_back(x->Run());
-                        }
-                    } else {
-                        for (auto& x : node[1]->node) {
-                            args.push_back(x->Run());
-                        }
-                    }
-                    return f(args);
-                }
-            }
-            if (is_constant(element.first)) {
-                return getConst();
-            } else {
-                return getVar(element.second);
-            }
-        }
         Any getConst() {
             if (!is_constant(element.first)) {
                 Error("Not a number.");
@@ -575,66 +552,8 @@ class AST {
             }
             return 0;
         }
-        function<Any(vector<Any>)> getFunc() {
-            if (element.first != is_func && element.first != is_op) {
-                Error("Not a function.");
-            }
-            if (keywords[element.second]) {
-                return nullptr;
-            }
-            if (element.second == ".") {
-                Any& f = (*getVar(node[0]->element.second == "this" ? this_refers_to : node[0]->element.second).cast<map<string, Any>>())[node[1]->element.second];
-                if (node[1]->element.first == is_string) {
-                    return [&](vector<Any> args) -> Any {
-                        return f;
-                    };
-                } else {
-                    return [&](vector<Any> args) -> Any {
-                        string tmp = this_refers_to;
-                        this_refers_to = node[0]->element.second;
-                        vector<Any>& vec = f.cast<GosFunc>()->f;
-                        AST *rt = f.cast<GosFunc>()->rt;
-#define CallFunction()                                              \
-                        vector<Any> bakvec(vec.size());             \
-                        for (int i = 0; i < vec.size(); i ++) {     \
-                            bakvec[i].Assign(vec[i]);               \
-                            vec[i].Assign(args[i]);                 \
-                        }                                           \
-                        Any ret = rt->Run();                        \
-                        for (int i = 0; i < vec.size(); i ++) {     \
-                            vec[i].Assign(bakvec[i]);               \
-                        }                                           \
-                        return ret;
-                        CallFunction();
-                        this_refers_to = tmp;
-                    };
-                }
-            }
-            //cout << "Calling function " << element.second << endl;
-            if (funcs.find(element.second) == funcs.end()) {
-                Any &f = getVar(element.second);
-                if (f.GetType() == typeid(map<string, Any>)) {
-                    return [&](vector<Any> args) -> Any {
-                        vector<Any>& vec = (*f.cast<map<string, Any>>())["at"].cast<GosFunc>()->f;
-                        AST *rt = (*f.cast<map<string, Any>>())["at"].cast<GosFunc>()->rt;
-                        CallFunction();
-                    };
-                } else if (f.GetType() == typeid(vector<Any>)) {
-                    return [&](vector<Any> args) -> Any {
-                        return f[args];
-                    };
-                } else if (f.GetType() == typeid(GosFunc)) {
-                    return [&](vector<Any> args) -> Any {
-                        vector<Any>& vec = f.cast<GosFunc>()->f;
-                        AST *rt = f.cast<GosFunc>()->rt;
-                        CallFunction();
-                    };
-                }
-                Error("Unknown function: " + element.second);
-            }
-            return funcs[element.second];
-        }
-#undef CallFunction
+        Any Run();
+        function<Any(vector<Any>)> getFunc();
         void print(int dep) {
 #define indent()                                \
             for (int i = 0; i < dep; ++ i) {    \
@@ -647,6 +566,161 @@ class AST {
             }
         }
 };
+
+struct GosFunc {
+    vector<Any> f;
+    AST* rt;
+};
+
+Any AST::Run() {
+    if (exit_func) {
+        if (endpoint) {
+            exit_func = false;
+            if (!(element.first == is_op && element.second == "return")) {
+                return exit_value;
+            }
+        } else {
+            return nullptr;
+        }
+    }
+    if (skip_rest) {
+        return nullptr;
+    }
+    if (element.first == is_func || element.first == is_op) {
+        auto f = getFunc();
+        if (f == nullptr) {
+            if (element.second == "for") {
+                for (node[0]->Run(); node[1]->Run().Int(); node[2]->Run()) {
+                    node[3]->Run();
+                    skip_rest = false;
+                    if (break_out || exit_func) {
+                        break_out = false;
+                        break;
+                    }
+                }
+            } else if (element.second == "if") {
+                if (node[0]->Run().Int()) {
+                    return node[1]->Run();
+                } else if (node.size() > 2) {
+                    return node[2]->Run();
+                }
+            } else if (element.second == "while") {
+                while (node[0]->Run().Int()) {
+                    node[1]->Run();
+                    skip_rest = false;
+                    if (break_out || exit_func) {
+                        break_out = false;
+                        break;
+                    }
+                }
+            } else if (element.second == "func") {
+                GosFunc f;
+                for (int i = 0; i < node.size() - 1; i ++) {
+                    f.f.push_back(var[node[i]->element.second]);
+                }
+                f.rt = last();
+                return f;
+            }
+            return nullptr;
+        } else {
+            vector<Any> args;
+            if (element.second != ".") {
+                for (auto& x : node) {
+                    args.push_back(x->Run());
+                }
+            } else {
+                for (auto& x : node[1]->node) {
+                    args.push_back(x->Run());
+                }
+            }
+            return f(args);
+        }
+    }
+    if (is_constant(element.first)) {
+        return getConst();
+    } else {
+        return getVar(element.second);
+    }
+}
+
+function<Any(vector<Any>)> AST::getFunc() {
+    if (element.first != is_func && element.first != is_op) {
+        Error("Not a function.");
+    }
+    if (keywords[element.second]) {
+        return nullptr;
+    }
+    if (element.second == ".") {
+        Any& f = (*getVar(node[0]->element.second == "this" ? this_refers_to : node[0]->element.second).cast<map<string, Any>>())[node[1]->element.second];
+        if (f.GetType() != typeid(GosFunc)) {
+        //if (node[1]->element.first == is_string && node[1]->node.size() == 0) {
+            if (f.GetType() == typeid(vector<Any>)) {
+                return [&](vector<Any> args) -> Any {
+                    return f[args];
+                };
+            } else {
+                return [&](vector<Any> args) -> Any {
+                    return f;
+                };
+            }
+        } else {
+            return [&](vector<Any> args) -> Any {
+                string tmp = this_refers_to;
+                if (node[0]->element.second != "this") {
+                    this_refers_to = node[0]->element.second;
+                }
+                vector<Any>& vec = f.cast<GosFunc>()->f;
+                AST *rt = f.cast<GosFunc>()->rt;
+#define CallFunction()                                      \
+                int size = min(vec.size(), args.size());    \
+                vector<Any> bakvec(size);                   \
+                for (int i = 0; i < size; i ++) {           \
+                    bakvec[i].Assign(vec[i]);               \
+                    vec[i].Assign(args[i]);                 \
+                }                                           \
+                Any ret = rt->Run();                        \
+                for (int i = 0; i < size; i ++) {           \
+                    vec[i].Assign(bakvec[i]);               \
+                }
+                CallFunction();
+                this_refers_to = tmp;
+                return ret;
+            };
+        }
+    }
+    //cout << "Calling function " << element.second << endl;
+    if (funcs.find(element.second) == funcs.end()) {
+        Any &f = getVar(element.second == "this" ? this_refers_to : element.second);
+        if (f.GetType() == typeid(map<string, Any>)) {
+            return [&](vector<Any> args) -> Any {
+                string tmp = this_refers_to;
+                if (element.second != "this") {
+                    this_refers_to = element.second;
+                }
+                Any &t = (*f.cast<map<string, Any>>())["at"];
+                vector<Any>& vec = t.cast<GosFunc>()->f;
+                AST *rt = t.cast<GosFunc>()->rt;
+                CallFunction();
+                this_refers_to = tmp;
+                return ret;
+            };
+        } else if (f.GetType() == typeid(vector<Any>)) {
+            return [&](vector<Any> args) -> Any {
+                return f[args];
+            };
+        } else if (f.GetType() == typeid(GosFunc)) {
+            return [&](vector<Any> args) -> Any {
+                vector<Any>& vec = f.cast<GosFunc>()->f;
+                AST *rt = f.cast<GosFunc>()->rt;
+                CallFunction();
+                return ret;
+            };
+        }
+        Error("Unknown function: " + element.second);
+    }
+    return funcs[element.second];
+}
+#undef CallFunction
 
 stack<AST*> lastif;
 void Build(AST* rt, stack<pair<int, string>>& st) {
@@ -776,7 +850,17 @@ void Gos::ClearGos() {
     root = new AST({is_func, "_"});
 }
 
-void Gos::ImportConioLib() {
+void Gos::ImportDefaultLib() {
+    funcs["exec"] = Func {
+        Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {args});
+        return nullptr;
+    };
+    root->addConst("PI", 3.1415926535);
+    root->addConst("E", 2.718281828459);
+    root->addConst("true", 1);
+    root->addConst("false", 0);
+    root->addConst("NULL", 0);
+    root->addConst("EOF", -1);
     root->addConst("BLACK", BLACK);
     root->addConst("BLUE", BLUE);
     root->addConst("GREEN",  GREEN);
@@ -822,6 +906,11 @@ void Gos::ImportConioLib() {
         s.push_back(readkey(args[0].Double()));
         return s;
     };
+    // Debug function
+    funcs["printAST"] = [&](vector<Any> args) -> Any {
+        root->print(0);
+        return nullptr;
+    };
 }
 
 void Gos::ImportConst(map<string, Any> consts) {
@@ -846,7 +935,7 @@ Any& Gos::GetVar(string name) {
     return root->getVar(name);
 }
 
-int Gos::RunGos(char filename[]) {
+Any Gos::BuildGos(const char filename[]) {
     if (filename != nullptr && strlen(filename) != 0) {
         fps.push(fopen(filename, "r"));
         if (fps.top() == NULL) {
@@ -855,7 +944,6 @@ int Gos::RunGos(char filename[]) {
     } else {
         fps.push(stdin);
     }
-    srand(time(NULL));
     stack<pair<int, string>> result, tmp, orig;
     while (true) {
         auto i = get_token();
@@ -918,21 +1006,29 @@ int Gos::RunGos(char filename[]) {
         //result.pop();
     //}
     //return 0;
-    root->addConst("PI", 3.1415926535);
-    root->addConst("E", 2.718281828459);
-    root->addConst("true", 1);
-    root->addConst("false", 0);
-    root->addConst("NULL", 0);
-    // Debug function
-    funcs["printAST"] = [&](vector<Any> args) -> Any {
-        root->print(0);
-        return nullptr;
-    };
-    while (!result.empty()) {
-        Build(root, result);
-    }
     root->newNode({is_func, "_"});
-    root->last()->endpoint = true;
-    return root->Run().Int();
+    AST *cur = root->last();
+    while (!result.empty()) {
+        Build(cur, result);
+    }
+    cur->newNode({is_func, "_"});
+    cur->last()->endpoint = true;
+    cur->addVar("args", 0);
+    return (GosFunc){{cur->getVar("args")}, cur};
+}
+
+Any Gos::ExecuteFunc(Any func, vector<Any> args) {
+    vector<Any>& vec = func.cast<GosFunc>()->f;
+    int size = min(vec.size(), args.size());
+    vector<Any> bakvec(size);
+    for (int i = 0; i < size; i ++) {
+        bakvec[i].Assign(vec[i]);
+        vec[i].Assign(args[i]);
+    }
+    Any ret = func.cast<GosFunc>()->rt->Run();
+    for (int i = 0; i < size; i ++) {
+        vec[i].Assign(bakvec[i]);
+    }
+    return ret;
 }
 

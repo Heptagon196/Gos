@@ -1,0 +1,22 @@
+#!/usr/bin/env gos
+getvar = struct();
+    getvar.Val = 0;
+    getvar.at = func() {
+        return(this.Val);
+    }
+    getvar.getInt = func() {
+        while (true) {
+            print("Input an integer: ");
+            if (!read(this.Val)) {
+                println("\nFailed to read.");
+                exit(1);
+            }
+            if (is_int(this.Val)) {
+                break;
+            } else {
+                print("It's not a integer! ");
+                continue;
+            }
+        }
+        return(this.Val);
+    }

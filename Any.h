@@ -8,21 +8,21 @@
 #include <cmath>
 #include <map>
 #include <functional>
+#include <memory>
 #include "Error.h"
 using namespace std;
 class Any {
     friend ostream& operator << (ostream&, const Any& a);
     friend istream& operator >> (istream&, Any& a);
     private:
-        any *x = new any;
+        shared_ptr<any> x = make_shared<any>(new any());
         bool isconst;
-        bool islink = false;
     public:
         Any() : isconst(false) {};
         template<typename T> Any(const T& val) : isconst(false) { *x = val; };
         template<typename T> Any& operator = (const T& val);
         template<typename T> T* cast() {
-            return any_cast<T>(x);
+            return any_cast<T>(x.get());
         }
         void SetConst();
         void SetVar();
@@ -34,6 +34,7 @@ class Any {
         function<void(vector<Any*>)> Func() const;
         int Int() const;
         double Double() const;
+        string String() const;
         const bool operator == (const Any& val) const;
         const bool operator != (const Any& val) const;
         const bool operator < (const Any& val) const;
