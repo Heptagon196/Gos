@@ -151,6 +151,10 @@ map<string, function<Any(vector<Any>)>> funcs = {
         args[0].Assign(args[1]);
         return args[0];
     }},
+    {":=", Func {
+        args[0].Assign(args[1]);
+        return args[0];
+    }},
     {"+=", Func {
         Any ans = args[0] + args[1];
         args[0].Assign(ans);
@@ -513,6 +517,12 @@ class AST {
             var[name].SetConst();
         }
         Any& getVar(string name) {
+            if ((fa->element.first == is_func || fa->element.first == is_op) && fa->element.second == ":=" && this == fa->node[0]) {
+                if (fa->fa->var.find(name) == fa->fa->var.end()) {
+                    fa->fa->var[name] = 0;
+                }
+                return fa->fa->var[name];
+            }
             AST* cur = this;
             while (cur != cur->fa) {
                 if (cur->var.find(name) != cur->var.end()) {
@@ -523,12 +533,8 @@ class AST {
             if (cur->var.find(name) != cur->var.end()) {
                 return cur->var[name];
             }
-            if ((fa->element.first == is_func || fa->element.first == is_op) && fa->element.second == "=") {
-                fa->fa->var[name] = 0;
-                return fa->fa->var[name];
-            }
-            cur->var[name] = 0;
-            return cur->var[name];
+            Error("No such variable: " + name);
+            return var[name];
         }
         Any getConst() {
             if (!is_constant(element.first)) {
@@ -816,6 +822,7 @@ void Build(AST* rt, stack<pair<int, string>>& st) {
 
 map<string, int> priority = {
     {"=", 0},
+    {":=", 0},
     {"+=", 0},
     {"-=", 0},
     {"*=", 0},
@@ -868,6 +875,11 @@ void Gos::ImportDefaultLib() {
     root->addConst("PURPLE", RED);
     root->addConst("YELLOW", YELLOW);
     root->addConst("WHITE", WHITE);
+#if defined(linux) || defined(__APPLE__)
+    root->addConst("LINUX", 1);
+#else
+    root->addConst("LINUX", 0);
+#endif
     funcs["gotoxy"] = Func {
         gotoxy(args[0].Int(), args[1].Int());
         return nullptr;

@@ -1,5 +1,5 @@
 #!/usr/bin/env gos
-getvar = struct();
+getvar := struct();
     getvar.Val = 0;
     getvar.at = func() {
         return(this.Val);
