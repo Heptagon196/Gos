@@ -1,0 +1,12 @@
+#!/usr/bin/env gos
+# Reference
+x := func(a, b) {
+    a = 3;
+    b = 4;
+    return(0);
+}
+a := 1;
+b := 2;
+println(a, " ", b);
+x(a, ref(b));
+println(a, " ", b);

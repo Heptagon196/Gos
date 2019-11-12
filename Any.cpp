@@ -243,13 +243,23 @@ Any& Any::Assign(Any& val) {
     return *this;
 }
 
-Any& Any::LinkTo(Any& val) {
+shared_ptr<any> Any::getRef() {
+    return x;
+}
+
+Any& Any::LinkTo(shared_ptr<any> val) {
     if (isconst) {
         Warning("Unable to change a const");
         return *this;
     }
-    x = val.x;
-    isconst = val.isconst;
+    x = val;
+    isconst = false;
+    return *this;
+}
+
+Any& Any::UnLink() {
+    x = make_shared<any>(new any());
+    isconst = false;
     return *this;
 }
 

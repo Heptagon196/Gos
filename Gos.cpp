@@ -30,6 +30,10 @@ map<char, char> conv = {
     {'\n', '\n'},
 };
 
+struct Reference {
+    shared_ptr<any> val;
+};
+
 #define Operator(op)                                \
     [](vector<Any> args) -> Any {                   \
         if (args.size() == 0) {                     \
@@ -148,6 +152,12 @@ map<string, function<Any(vector<Any>)>> funcs = {
     {"!", Func { return args[0].Int() ? 0 : 1; }},
     {"~", Func { return ~args[0].Int(); }},
     {"=", Func {
+        if (args[0].GetType() == typeid(Reference)) {
+            Any tmp;
+            tmp.LinkTo(args[0].cast<Reference>()->val);
+            tmp.Assign(args[1]);
+            return args[0];
+        }
         args[0].Assign(args[1]);
         return args[0];
     }},
@@ -313,6 +323,9 @@ map<string, function<Any(vector<Any>)>> funcs = {
         cout.rdbuf(fout.rdbuf());
         return 1;
     }},
+    {"ref", Func {
+        return (Reference){args[0].getRef()};
+    }}
 };
 
 map<string, bool> keywords = {
@@ -659,7 +672,6 @@ function<Any(vector<Any>)> AST::getFunc() {
     if (element.second == ".") {
         Any& f = (*getVar(node[0]->element.second == "this" ? this_refers_to : node[0]->element.second).cast<map<string, Any>>())[node[1]->element.second];
         if (f.GetType() != typeid(GosFunc)) {
-        //if (node[1]->element.first == is_string && node[1]->node.size() == 0) {
             if (f.GetType() == typeid(vector<Any>)) {
                 return [&](vector<Any> args) -> Any {
                     return f[args];
@@ -677,16 +689,16 @@ function<Any(vector<Any>)> AST::getFunc() {
                 }
                 vector<Any>& vec = f.cast<GosFunc>()->f;
                 AST *rt = f.cast<GosFunc>()->rt;
-#define CallFunction()                                      \
-                int size = min(vec.size(), args.size());    \
-                vector<Any> bakvec(size);                   \
-                for (int i = 0; i < size; i ++) {           \
-                    bakvec[i].Assign(vec[i]);               \
-                    vec[i].Assign(args[i]);                 \
-                }                                           \
-                Any ret = rt->Run();                        \
-                for (int i = 0; i < size; i ++) {           \
-                    vec[i].Assign(bakvec[i]);               \
+#define CallFunction()                                                  \
+                int size = min(vec.size(), args.size());                \
+                vector<Any> bakvec(size);                               \
+                for (int i = 0; i < size; i ++) {                       \
+                    bakvec[i].Assign(vec[i]);                           \
+                    vec[i].Assign(args[i]);                             \
+                }                                                       \
+                Any ret = rt->Run();                                    \
+                for (int i = 0; i < size; i ++) {                       \
+                    vec[i].Assign(bakvec[i]);                           \
                 }
                 CallFunction();
                 this_refers_to = tmp;

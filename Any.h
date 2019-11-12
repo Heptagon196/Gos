@@ -24,6 +24,7 @@ class Any {
         template<typename T> T* cast() {
             return any_cast<T>(x.get());
         }
+        shared_ptr<any> getRef();
         void SetConst();
         void SetVar();
         void SetFunction(function<void(vector<Any*> args)> func);
@@ -47,7 +48,8 @@ class Any {
         Any operator / (const Any& val) const;
         Any Pow(const Any& val);
         Any& Assign(Any& val);
-        Any& LinkTo(Any& val);
+        Any& LinkTo(shared_ptr<any> val);
+        Any& UnLink();
         //support for vector
         void PushBack(Any val);
         void PopBack();
