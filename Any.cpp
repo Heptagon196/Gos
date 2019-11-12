@@ -279,6 +279,13 @@ void Any::PopBack() {
     cast<vector<Any>>()->pop_back();
 }
 
+void Any::EraseAt(int p) {
+    if (x->type() != typeid(vector<Any>)) {
+        Error("Not a vector.");
+    }
+    cast<vector<Any>>()->erase(cast<vector<Any>>()->begin() + p);
+}
+
 int Any::GetSize() const {
     if (x->type() != typeid(vector<Any>)) {
         Error("Not a vector.");

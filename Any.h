@@ -53,6 +53,7 @@ class Any {
         //support for vector
         void PushBack(Any val);
         void PopBack();
+        void EraseAt(int p);
         int GetSize() const;
         Any& operator [] (const int& id);
         Any& operator [] (const vector<Any>& ids);

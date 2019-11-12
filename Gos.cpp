@@ -199,13 +199,13 @@ map<string, function<Any(vector<Any>)>> funcs = {
     {"get", Func {
         return args[0][args[1].Int()];
     }},
+    {"remove", Func {
+        args[0].EraseAt(args[1].Int());
+        return nullptr;
+    }},
     {"size", Func {
         return args[0].GetSize();
     }},
-    //{"alias", Func {
-        //args[0].LinkTo(args[1]);
-        //return nullptr;
-    //}},
     {"print", Func {
         for (const auto& x : args) {
             cout << x;
