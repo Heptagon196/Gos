@@ -323,6 +323,19 @@ map<string, function<Any(vector<Any>)>> funcs = {
         cout.rdbuf(fout.rdbuf());
         return 1;
     }},
+    {"append_to", Func {
+        if (args[0].String() == "/dev/stdout") {
+            fout.close();
+            cout.rdbuf(OutBuf);
+            return 1;
+        }
+        fout.open(args[0].String(), ios::app);
+        if (!fout) {
+            return 0;
+        }
+        cout.rdbuf(fout.rdbuf());
+        return 1;
+    }},
     {"ref", Func {
         return (Reference){args[0].getRef()};
     }}
