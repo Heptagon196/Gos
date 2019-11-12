@@ -896,7 +896,11 @@ void Gos::ClearGos() {
 
 void Gos::ImportDefaultLib() {
     funcs["exec"] = Func {
-        return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {args});
+        if (args.size() > 1) {
+            return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {args[1]});
+        } else {
+            return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {});
+        }
     };
     root->addConst("PI", 3.1415926535);
     root->addConst("E", 2.718281828459);
