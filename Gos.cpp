@@ -899,7 +899,7 @@ void Gos::ImportDefaultLib() {
         if (args.size() > 1) {
             return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {args[1]});
         } else {
-            return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {});
+            return Gos::ExecuteFunc(Gos::BuildGos(args[0].String().c_str()), {(vector<Any>){}});
         }
     };
     root->addConst("PI", 3.1415926535);
