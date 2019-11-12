@@ -338,7 +338,11 @@ map<string, function<Any(vector<Any>)>> funcs = {
     }},
     {"ref", Func {
         return (Reference){args[0].getRef()};
-    }}
+    }},
+    {"global", Func {
+        args[0].Assign(args[1]);
+        return nullptr;
+    }},
 };
 
 map<string, bool> keywords = {
@@ -543,13 +547,21 @@ class AST {
             var[name].SetConst();
         }
         Any& getVar(string name) {
-            if ((fa->element.first == is_func || fa->element.first == is_op) && fa->element.second == ":=" && this == fa->node[0]) {
-                if (fa->fa->var.find(name) == fa->fa->var.end()) {
-                    fa->fa->var[name] = 0;
-                }
-                return fa->fa->var[name];
-            }
             AST* cur = this;
+            if ((fa->element.first == is_func || fa->element.first == is_op) && this == fa->node[0]) {
+                if (fa->element.second == ":=") {
+                    if (fa->fa->var.find(name) == fa->fa->var.end()) {
+                        fa->fa->var[name] = 0;
+                    }
+                    return fa->fa->var[name];
+                } else if (fa->element.second == "global") {
+                    while (cur != cur->fa) {
+                        cur = cur->fa;
+                    }
+                    cur->var[name] = 0;
+                    return cur->var[name];
+                }
+            }
             while (cur != cur->fa) {
                 if (cur->var.find(name) != cur->var.end()) {
                     return cur->var[name];
