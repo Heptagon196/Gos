@@ -1,12 +1,6 @@
 #include "Gos.h"
 using namespace std;
 
-const string TypeName[] = {"vector", "string", "int", "double", "var", "func", "op"};
-ostream& operator << (ostream& fout, const pair<int, string>& x) {
-    fout << "|" << TypeName[x.first] << "|" << x.second << "|";
-    return fout;
-}
-
 char buffer = 0;
 
 bool skip_rest = false;
@@ -76,8 +70,28 @@ struct Reference {
 #define Func [](vector<Any> args) -> Any
 
 map<string, function<Any(vector<Any>)>> funcs = {
-    {"int", Func { return int(args[0].Double()); }},
-    {"float", Func { return double(args[0].Int()); }},
+    {"int", Func {
+        if (args[0].GetType() == typeid(double)) {
+            return int(args[0].Double());
+        } else {
+            stringstream ss;
+            int out;
+            ss << args[0];
+            ss >> out;
+            return out;
+        }
+    }},
+    {"float", Func {
+        if (args[0].GetType() == typeid(int)) {
+            return double(args[0].Int());
+        } else {
+            stringstream ss;
+            double out;
+            ss << args[0];
+            ss >> out;
+            return out;
+        }
+    }},
     {"string", Func {
         stringstream ss;
         string out;
@@ -368,35 +382,67 @@ bool is_constant(int x) {
 #define is_right_brace(s) ((s) == ")" || (s) == "]" || (s) == "}")
 
 stack<FILE*> fps;
+vector<string> filenames;
+stack<int> curfile;
+stack<int> linecnt;
 bool conv_to_string = false;
-pair<int, string> get_token() {
+
+char GetChar(FILE *fp) {
+    char ch = fgetc(fp);
+    if (ch == '\n') {
+        linecnt.top() ++;
+    }
+    return ch;
+}
+
+struct Element {
+    int type;
+    string content;
+    int line;
+    int file;
+    Element(int type, string content, int line, int file) : type(type), content(content), line(line), file(file) {
+    }
+};
+
+const string TypeName[] = {"vector", "string", "int", "double", "var", "func", "op"};
+ostream& operator << (ostream& fout, const Element& x) {
+    fout << "|" << TypeName[x.type] << "|" << x.content<< "|";
+    return fout;
+}
+
+void Error(string msg, int line, int file) {
+    __Error(filenames[file] + ":" + to_string(line) + ": " + msg);
+    exit(1);
+}
+
+Element get_token() {
     static int last_token_type = -1;
     int ch, type;
     FILE *fp = fps.top();
     if (buffer == 0) {
-        ch = fgetc(fp);
+        ch = GetChar(fp);
     } else {
         ch = buffer;
         buffer = 0;
         if (ch == ';') {
-            return {is_op, ";"};
+            return {is_op, ";", linecnt.top(), curfile.top()};
         }
         if (ch == '.') {
             conv_to_string = true;
-            return {is_op, "."};
+            return {is_op, ".", linecnt.top(), curfile.top()};
         }
     }
     string ans = "";
     RECHECK:;
     while (ch == '\n' || ch == '\r' || ch == ' ' || ch == '\t') {
-        ch = fgetc(fp);
+        ch = GetChar(fp);
     }
     if (ch == '#') {
         string command = "";
         string argument = "";
         string *cur = &command;
         while (ch != '\n') {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
             if (ch == ' ') {
                 cur = &argument;
                 continue;
@@ -408,8 +454,11 @@ pair<int, string> get_token() {
         if (command.length() > 0 && command[0] == '#') {
             if (command == "#include") {
                 fps.push(fopen(argument.c_str(), "r"));
+                filenames.push_back(argument);
+                curfile.push(filenames.size() - 1);
+                linecnt.push(1);
                 if (fps.top() == NULL) {
-                    Error("Unknown file: " + argument);
+                    Error("Unknown file: " + argument, linecnt.top(), curfile.top());
                 }
                 return get_token();
             }
@@ -422,36 +471,36 @@ pair<int, string> get_token() {
         if (ch == '}') {
             buffer = ';';
             conv_to_string = false;
-            return {last_token_type = is_op, "}"};
+            return {last_token_type = is_op, "}", linecnt.top(), curfile.top()};
         } else {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
         }
     } else if (ch == '"') {
         type = is_string;
         ans.pop_back();
         while (ch != EOF) {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
             if (ch ==  '"') {
                 break;
             }
             if (ch == '\\') {
-                ch = conv[fgetc(fp)];
+                ch = conv[GetChar(fp)];
             }
             ans += ch;
         }
-        ch = fgetc(fp);
+        ch = GetChar(fp);
     } else if (isdigit(ch) || ch == '.' || (ch == '-' && !is_constant(last_token_type))) {
         type = is_int;
         if (ch == '.') {
             type = is_double;
         }
-        while (isdigit(ch = fgetc(fp)) || ch == '.' || ch == 'f') {
+        while (isdigit(ch = GetChar(fp)) || ch == '.' || ch == 'f') {
             if (ch == '.') {
                 type = is_double;
             }
             if (ch == 'f') {
                 type = is_double;
-                ch = fgetc(fp);
+                ch = GetChar(fp);
                 break;
             }
             ans += ch;
@@ -460,34 +509,34 @@ pair<int, string> get_token() {
             type = is_op;
             if (ch == '=') {
                 ans += ch;
-                ch = fgetc(fp);
+                ch = GetChar(fp);
             }
         }
     } else if (isalpha(ch)) {
         type = is_func;
-        while (isalpha(ch = fgetc(fp)) || isdigit(ch) || ch == '_') {
+        while (isalpha(ch = GetChar(fp)) || isdigit(ch) || ch == '_') {
             ans += ch;
         }
         while (ch == ' ') {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
         }
         if (ch != '(' && ch != '[' && ch != '{') {
             type = is_var;
             if (ch == '.') {
                 buffer = '.';
                 conv_to_string = false;
-                return {last_token_type = type, ans};
+                return {last_token_type = type, ans, linecnt.top(), curfile.top()};
             }
             if (conv_to_string) {
                 conv_to_string = false;
                 type = is_string;
             }
         } else {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
         }
     } else {
         type = is_op;
-        while (((ch = fgetc(fp)) != EOF) && !isdigit(ch) && !isalpha(ch) && ch != '.' && ch !='_' && ch != ' ' && ch != '\n' && ch != '\r' && ch != '\t' && ch != '(' && ch != '[' && ch != '{' && ch != '"') {
+        while (((ch = GetChar(fp)) != EOF) && !isdigit(ch) && !isalpha(ch) && ch != '.' && ch !='_' && ch != ' ' && ch != '\n' && ch != '\r' && ch != '\t' && ch != '(' && ch != '[' && ch != '{' && ch != '"') {
             ans += ch;
             if (ans.length() == 2) {
                 if (ans[1] == '-' && ans[0] != '-') {
@@ -495,7 +544,7 @@ pair<int, string> get_token() {
                     ch = '-';
                     break;
                 } else {
-                    ch = fgetc(fp);
+                    ch = GetChar(fp);
                     break;
                 }
             }
@@ -503,7 +552,7 @@ pair<int, string> get_token() {
     }
     if (ch != EOF) {
         while (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') {
-            ch = fgetc(fp);
+            ch = GetChar(fp);
         }
         if (ch != EOF) {
             buffer = ch;
@@ -511,24 +560,23 @@ pair<int, string> get_token() {
     }
     conv_to_string = false;
     last_token_type = type;
-    return {type, ans};
+    return {type, ans, linecnt.top(), curfile.top()};
 }
 
 class AST {
     public:
-        pair<int, string> element;
+        Element element;
         map<string, Any> var;
         vector<AST*> node;
         AST* fa = this;
         //AST* lastif;
         bool endpoint = false;
 
-        AST() {}
-        AST(const pair<int, string>& element) : element(element) {}
+        AST(const Element& element) : element(element) {}
         AST* last() {
             return node[node.size() - 1];
         }
-        void newNode(const pair<int, string>& token) {
+        void newNode(const Element& token) {
             node.push_back(new AST(token));
             last()->fa = this;
         }
@@ -548,13 +596,13 @@ class AST {
         }
         Any& getVar(string name) {
             AST* cur = this;
-            if ((fa->element.first == is_func || fa->element.first == is_op) && this == fa->node[0]) {
-                if (fa->element.second == ":=") {
+            if ((fa->element.type == is_func || fa->element.type == is_op) && this == fa->node[0]) {
+                if (fa->element.content == ":=") {
                     if (fa->fa->var.find(name) == fa->fa->var.end()) {
                         fa->fa->var[name] = 0;
                     }
                     return fa->fa->var[name];
-                } else if (fa->element.second == "global") {
+                } else if (fa->element.content == "global") {
                     while (cur != cur->fa) {
                         cur = cur->fa;
                     }
@@ -571,18 +619,18 @@ class AST {
             if (cur->var.find(name) != cur->var.end()) {
                 return cur->var[name];
             }
-            Error("No such variable: " + name);
+            Error("No such variable: " + name, element.line, element.file);
             return var[name];
         }
         Any getConst() {
-            if (!is_constant(element.first)) {
-                Error("Not a number.");
+            if (!is_constant(element.type)) {
+                Error("Not a number.", element.line, element.file);
             }
             stringstream ss;
-            ss << element.second;
+            ss << element.content;
             Any ret;
 #define conv_to(x)                              \
-            if (element.first == is_ ## x) {    \
+            if (element.type == is_ ## x) {    \
                 x tmp;                          \
                 ss >> tmp;                      \
                 ret = tmp;                      \
@@ -591,8 +639,8 @@ class AST {
             }
             conv_to(int);
             conv_to(double);
-            if (element.first == is_string) {
-                return element.second;
+            if (element.type == is_string) {
+                return element.content;
             }
             return 0;
         }
@@ -620,7 +668,7 @@ Any AST::Run() {
     if (exit_func) {
         if (endpoint) {
             exit_func = false;
-            if (!(element.first == is_op && element.second == "return")) {
+            if (!(element.type == is_op && element.content == "return")) {
                 return exit_value;
             }
         } else {
@@ -630,10 +678,10 @@ Any AST::Run() {
     if (skip_rest) {
         return nullptr;
     }
-    if (element.first == is_func || element.first == is_op) {
+    if (element.type == is_func || element.type == is_op) {
         auto f = getFunc();
         if (f == nullptr) {
-            if (element.second == "for") {
+            if (element.content == "for") {
                 for (node[0]->Run(); node[1]->Run().Int(); node[2]->Run()) {
                     node[3]->Run();
                     skip_rest = false;
@@ -642,13 +690,13 @@ Any AST::Run() {
                         break;
                     }
                 }
-            } else if (element.second == "if") {
+            } else if (element.content == "if") {
                 if (node[0]->Run().Int()) {
                     return node[1]->Run();
                 } else if (node.size() > 2) {
                     return node[2]->Run();
                 }
-            } else if (element.second == "while") {
+            } else if (element.content == "while") {
                 while (node[0]->Run().Int()) {
                     node[1]->Run();
                     skip_rest = false;
@@ -657,10 +705,10 @@ Any AST::Run() {
                         break;
                     }
                 }
-            } else if (element.second == "func") {
+            } else if (element.content == "func") {
                 GosFunc f;
                 for (int i = 0; i < node.size() - 1; i ++) {
-                    f.f.push_back(var[node[i]->element.second]);
+                    f.f.push_back(var[node[i]->element.content]);
                 }
                 f.rt = last();
                 return f;
@@ -668,7 +716,7 @@ Any AST::Run() {
             return nullptr;
         } else {
             vector<Any> args;
-            if (element.second != ".") {
+            if (element.content != ".") {
                 for (auto& x : node) {
                     args.push_back(x->Run());
                 }
@@ -680,22 +728,22 @@ Any AST::Run() {
             return f(args);
         }
     }
-    if (is_constant(element.first)) {
+    if (is_constant(element.type)) {
         return getConst();
     } else {
-        return getVar(element.second);
+        return getVar(element.content);
     }
 }
 
 function<Any(vector<Any>)> AST::getFunc() {
-    if (element.first != is_func && element.first != is_op) {
-        Error("Not a function.");
+    if (element.type != is_func && element.type != is_op) {
+        Error("Not a function.", element.line, element.file);
     }
-    if (keywords[element.second]) {
+    if (keywords[element.content]) {
         return nullptr;
     }
-    if (element.second == ".") {
-        Any& f = (*getVar(node[0]->element.second == "this" ? this_refers_to : node[0]->element.second).cast<map<string, Any>>())[node[1]->element.second];
+    if (element.content == ".") {
+        Any& f = (*getVar(node[0]->element.content == "this" ? this_refers_to : node[0]->element.content).cast<map<string, Any>>())[node[1]->element.content];
         if (f.GetType() != typeid(GosFunc)) {
             if (f.GetType() == typeid(vector<Any>)) {
                 return [&](vector<Any> args) -> Any {
@@ -709,8 +757,8 @@ function<Any(vector<Any>)> AST::getFunc() {
         } else {
             return [&](vector<Any> args) -> Any {
                 string tmp = this_refers_to;
-                if (node[0]->element.second != "this") {
-                    this_refers_to = node[0]->element.second;
+                if (node[0]->element.content != "this") {
+                    this_refers_to = node[0]->element.content;
                 }
                 vector<Any>& vec = f.cast<GosFunc>()->f;
                 AST *rt = f.cast<GosFunc>()->rt;
@@ -731,14 +779,14 @@ function<Any(vector<Any>)> AST::getFunc() {
             };
         }
     }
-    //cout << "Calling function " << element.second << endl;
-    if (funcs.find(element.second) == funcs.end()) {
-        Any &f = getVar(element.second == "this" ? this_refers_to : element.second);
+    //cout << "Calling function " << element.content << endl;
+    if (funcs.find(element.content) == funcs.end()) {
+        Any &f = getVar(element.content == "this" ? this_refers_to : element.content);
         if (f.GetType() == typeid(map<string, Any>)) {
             return [&](vector<Any> args) -> Any {
                 string tmp = this_refers_to;
-                if (element.second != "this") {
-                    this_refers_to = element.second;
+                if (element.content != "this") {
+                    this_refers_to = element.content;
                 }
                 Any &t = (*f.cast<map<string, Any>>())["at"];
                 vector<Any>& vec = t.cast<GosFunc>()->f;
@@ -759,56 +807,56 @@ function<Any(vector<Any>)> AST::getFunc() {
                 return ret;
             };
         }
-        Error("Unknown function: " + element.second);
+        Error("Unknown function: " + element.content, element.line, element.file);
     }
-    return funcs[element.second];
+    return funcs[element.content];
 }
 #undef CallFunction
 
 stack<AST*> lastif;
-void Build(AST* rt, stack<pair<int, string>>& st) {
-    //while (!st.empty() && (st.top().first == is_op && (st.top().second == "(" || st.top().second == ")"))) {
+void Build(AST* rt, stack<Element>& st) {
+    //while (!st.empty() && (st.top().type == is_op && (st.top().content == "(" || st.top().content == ")"))) {
         //st.pop();
     //}
     if (st.empty()) {
         return ;
     }
     auto p = st.top();
-    if (p.first == is_var && (p.second == "else" || p.second == "break" || p.second == "continue")) {
-        p.first = is_func;
+    if (p.type == is_var && (p.content == "else" || p.content == "break" || p.content == "continue")) {
+        p.type = is_func;
     }
     //cout << p << " is built" << endl;
     st.pop();
-    if (!rt->node.empty() && (rt->last()->element.first == is_func && rt->last()->element.second == "if")) {
-        if (!(p.first == is_op && p.second == "else")) {
+    if (!rt->node.empty() && (rt->last()->element.type == is_func && rt->last()->element.content == "if")) {
+        if (!(p.type == is_op && p.content == "else")) {
             //lastif.pop();
         }
     }
     rt->newNode(p);
-    if (is_constant(p.first) || (p.first == is_var)) {
+    if (is_constant(p.type) || (p.type == is_var)) {
         return ;
     }
-    if (p.first == is_func) {
-        //if (p.second == "if") {
+    if (p.type == is_func) {
+        //if (p.content == "if") {
             //lastif.push(rt->last());
             ////rt->fa->lastif = rt->last();
         //}
-        if (p.second == "else") {
+        if (p.content == "else") {
             AST *curlastif = lastif.top();
             //AST *curlastif = rt->fa->lastif;
             rt->node.pop_back();
-            curlastif->newNode({is_func, "_"});
+            curlastif->newNode({is_func, "_", curlastif->last()->element.line, curlastif->last()->element.file});
             //rt->fa->fa->fa->fa->fa->fa->fa->fa->print(0);
             //getchar();
             bool has_brace = false;
-            if (is_left_brace(st.top().second)) {
+            if (is_left_brace(st.top().content)) {
                 has_brace = true;
             }
             if (has_brace) {
                 st.pop();
             }
             if (has_brace) {
-                while (!st.empty() && !(st.top().first == is_op && is_right_brace(st.top().second))) {
+                while (!st.empty() && !(st.top().type == is_op && is_right_brace(st.top().content))) {
                     Build(curlastif->last(), st);
                 }
             } else {
@@ -817,41 +865,41 @@ void Build(AST* rt, stack<pair<int, string>>& st) {
             if (has_brace) {
                 st.pop();
             }
-        } else if (p.second == "break" || p.second == "continue") {
+        } else if (p.content == "break" || p.content == "continue") {
             //rt->fa->fa->fa->fa->fa->fa->fa->fa->print(0);
         } else {
             st.pop();
-            while (!st.empty() && !(st.top().first == is_op && is_right_brace(st.top().second))) {
+            while (!st.empty() && !(st.top().type == is_op && is_right_brace(st.top().content))) {
                 Build(rt->last(), st);
             }
             st.pop();
         }
-        if (keywords[p.second]) {
+        if (keywords[p.content]) {
             Build(rt->last(), st);
         }
-        if (p.second == "if") {
-            if (!st.empty() && ((st.top().first == is_func || st.top().first == is_var) && st.top().second == "else")) {
+        if (p.content == "if") {
+            if (!st.empty() && ((st.top().type == is_func || st.top().type == is_var) && st.top().content == "else")) {
                 lastif.push(rt->last());
             }
         }
-        if (p.second == "func") {
-            rt->last()->last()->newNode({is_func, "_"});
+        if (p.content == "func") {
+            rt->last()->last()->newNode({is_func, "_", rt->last()->last()->last()->element.line, rt->last()->last()->last()->element.file});
             rt->last()->last()->last()->endpoint = true;
         }
         return ;
     }
-    if (p.first == is_op) {
+    if (p.type == is_op) {
         Build(rt->last(), st);
-        if (p.second != "!" && p.second != "~") {
+        if (p.content != "!" && p.content != "~") {
             Build(rt->last(), st);
         }
         return ;
     }
-    if (st.top().first != is_op || is_left_brace(st.top ().second)) {
-        Error("Not a function.");
+    if (st.top().type != is_op || is_left_brace(st.top().content)) {
+        Error("Not a function.", st.top().line, st.top().file);
     }
     //st.pop();
-    while (st.top().first != is_op && is_right_brace(st.top().second)) {
+    while (st.top().type != is_op && is_right_brace(st.top().content)) {
         Build(rt->last(), st);
     }
     //st.pop();
@@ -885,13 +933,13 @@ map<string, int> priority = {
     {".", 11},
 };
 
-AST* root = new AST({is_func, "_"});
+AST* root = new AST({is_func, "_", 1, 0});
 
 void Gos::ClearGos() {
     if (root != nullptr) {
         delete root;
     }
-    root = new AST({is_func, "_"});
+    root = new AST({is_func, "_", 1, 0});
 }
 
 void Gos::ImportDefaultLib() {
@@ -990,17 +1038,26 @@ Any& Gos::GetVar(string name) {
 Any Gos::BuildGos(const char filename[]) {
     if (filename != nullptr && strlen(filename) != 0) {
         fps.push(fopen(filename, "r"));
+        filenames.push_back(filename);
+        curfile.push(filenames.size() - 1);
+        linecnt.push(1);
         if (fps.top() == NULL) {
-            Error("Unknown file: " + (string)filename);
+            fps.pop();
+            Error("Unknown file: " + (string)filename, linecnt.top(), 0);
         }
     } else {
         fps.push(stdin);
+        filenames.push_back("/dev/stdin");
+        curfile.push(filenames.size() - 1);
+        linecnt.push(1);
     }
-    stack<pair<int, string>> result, tmp, orig;
+    stack<Element> result, tmp, orig;
     while (true) {
         auto i = get_token();
-        if (i.second.length() > 0 && i.second[0] == EOF) {
+        if (i.content.length() > 0 && i.content[0] == EOF) {
             fps.pop();
+            linecnt.pop();
+            curfile.pop();
             if (fps.empty()) {
                 break;
             } else {
@@ -1013,33 +1070,33 @@ Any Gos::BuildGos(const char filename[]) {
     while (!orig.empty()) {
         auto p = orig.top();
         orig.pop();
-        if (p.first == is_op && (p.second == ";"  || p.second == ",")) {
-            while (!tmp.empty() && !(tmp.top().first == is_op && is_right_brace(tmp.top().second))) {
+        if (p.type == is_op && (p.content == ";"  || p.content == ",")) {
+            while (!tmp.empty() && !(tmp.top().type == is_op && is_right_brace(tmp.top().content))) {
                 result.push(tmp.top());
                 tmp.pop();
             }
             continue;
         }
-        if (is_constant(p.first) || p.first == is_var) {
+        if (is_constant(p.type) || p.type == is_var) {
             result.push(p);
-        } else if (p.first == is_op && is_right_brace(p.second)) {
+        } else if (p.type == is_op && is_right_brace(p.content)) {
             result.push(p);
             tmp.push(p);
-        } else if ((p.first == is_op && is_left_brace(p.second)) || p.first == is_func) {
-            while (!is_right_brace(tmp.top().second)) {
+        } else if ((p.type == is_op && is_left_brace(p.content)) || p.type == is_func) {
+            while (!is_right_brace(tmp.top().content)) {
                 result.push(tmp.top());
                 tmp.pop();
             }
-            result.push({is_op, "("});
+            result.push({is_op, "(", p.line, p.file});
             tmp.pop();
-            if (p.first == is_func) {
+            if (p.type == is_func) {
                 result.push(p);
             } else {
-                result.push({is_func, "_"});
+                result.push({is_func, "_", p.line, p.file});
             }
         } else {
             while (true) {
-                if (tmp.empty() || (tmp.top().first == is_op && is_right_brace(tmp.top().second)) || priority[p.second] >= priority[tmp.top().second]) {
+                if (tmp.empty() || (tmp.top().type == is_op && is_right_brace(tmp.top().content)) || priority[p.content] >= priority[tmp.top().content]) {
                     tmp.push(p);
                     break;
                 } else {
@@ -1058,12 +1115,12 @@ Any Gos::BuildGos(const char filename[]) {
         //result.pop();
     //}
     //return 0;
-    root->newNode({is_func, "_"});
+    root->newNode({is_func, "_", 1, 0});
     AST *cur = root->last();
     while (!result.empty()) {
         Build(cur, result);
     }
-    cur->newNode({is_func, "_"});
+    cur->newNode({is_func, "_", cur->last()->element.line, cur->last()->element.file});
     cur->last()->endpoint = true;
     cur->addVar("args", 0);
     return (GosFunc){{cur->getVar("args")}, cur};

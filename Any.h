@@ -10,6 +10,8 @@
 #include <functional>
 #include <memory>
 #include "Error.h"
+#define Warning(msg) __Warning(msg)
+
 using namespace std;
 class Any {
     friend ostream& operator << (ostream&, const Any& a);

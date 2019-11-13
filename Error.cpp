@@ -7,7 +7,6 @@ void __Error(string msg) {
     cout << "Error: ";
     clearcolor();
     cout << msg << endl;
-    exit(1);
 }
 
 void __Warning(string msg) {

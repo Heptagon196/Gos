@@ -1,4 +1,5 @@
 #include "Any.h"
+#define Error(msg) {__Error(msg); exit(1);}
 
 #define Output(Type)                    \
     if (a.x->type() == typeid(Type)) {  \
