@@ -10,7 +10,6 @@
 #include <functional>
 #include <memory>
 #include "Error.h"
-#define Warning(msg) __Warning(msg)
 
 using namespace std;
 class Any {
@@ -66,7 +65,7 @@ ostream& operator << (ostream& os, const Any& a);
 
 template<typename T>Any& Any::operator = (const T& val) {
     if (isconst) {
-        Warning("Unable to change a const");
+        __Warning("Unable to change a const");
         return *this;
     }
     *x = val;

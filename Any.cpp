@@ -1,4 +1,5 @@
 #include "Any.h"
+#define Warning(msg) __Warning(msg)
 #define Error(msg) {__Error(msg); exit(1);}
 
 #define Output(Type)                    \
