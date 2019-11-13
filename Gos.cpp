@@ -415,6 +415,15 @@ void Error(string msg, int line, int file) {
     exit(1);
 }
 
+void removeSpaces(string& s) {
+    while (s.length() > 0 && s[0] == ' ') {
+        s = s.substr(1, s.length() - 1);
+    }
+    while (s.length() > 0 && s[s.length() - 1] == ' ') {
+        s.pop_back();
+    }
+}
+
 Element get_token() {
     static int last_token_type = -1;
     int ch, type;
@@ -445,12 +454,13 @@ Element get_token() {
             ch = GetChar(fp);
             if (ch == ' ') {
                 cur = &argument;
-                continue;
             }
             if (ch != '\n') {
                 cur->push_back(ch);
             }
         }
+        removeSpaces(command);
+        removeSpaces(argument);
         if (command.length() > 0 && command[0] == '#') {
             if (command == "#include") {
                 fps.push(fopen(argument.c_str(), "r"));
