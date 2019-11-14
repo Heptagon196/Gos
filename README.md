@@ -8,3 +8,61 @@
 examples 目录下的 example.gos 是个对目前实现功能的示例。
 
 snake.gos 是一个简单的贪吃蛇程序。
+
+它看起来是这样的：
+```bash
+#!/usr/bin/env gos
+# This is a comment
+
+# Sum
+sum := 0;
+for (i := 0; i <= 100; i += 1) {
+    sum += i;
+    # sum = sum + i;
+}
+println("The sum from 1 to 100 is: ", sum);
+
+# Factorial
+fact := func(x) {
+    if (x == 0) {
+        return(1);
+    } else {
+        return(x * fact(x - 1));
+    }
+    # return(if (x == 0) { 1 } else { x * fact(x - 1) });
+}
+println("10! = ", fact(10));
+
+# Prime numbers
+print("The prime numbers from 1 to 100 include: ");
+isprime := func(x) {
+    for (i := 2; i <= int(sqrt(float(x))); i += 1) {
+        if (x % i == 0) {
+            return(false);
+        }
+    }
+    return(true);
+}
+for (i := 2; i <= 100; i += 1) {
+    if (isprime(i)) {
+        print(i, " ");
+    }
+}
+println();
+
+# Struct
+struct (Box) {
+    Box.length = 0;
+    Box.breadth = 0;
+    Box.height = 0;
+    Box.read = func() {
+        read(this.length, this.breadth, this.height);
+    }
+    Box.getVolume = func() {
+        return(this.length * this.breadth * this.height);
+    }
+}
+x := Box;
+x.read();
+println(x.getVolume());
+```

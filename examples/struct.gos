@@ -1,5 +1,5 @@
 #!/usr/bin/env gos
-Box := struct();
+struct (Box) {
     Box.length = 0;
     Box.breadth = 0;
     Box.height = 0;
@@ -9,6 +9,7 @@ Box := struct();
     Box.getVolume = func() {
         return(this.length * this.breadth * this.height);
     }
+}
 x := Box;
 x.read();
 println(x.getVolume());

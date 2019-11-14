@@ -112,13 +112,6 @@ map<string, function<Any(vector<Any>)>> funcs = {
         }
         return ret;
     }},
-    {"struct", Func {
-        map<string, Any> ret;
-        for (int i = 0; i < args.size(); i ++) {
-            ret[*args[i].cast<string>()] = 0;
-        }
-        return ret;
-    }},
     {"sin", Func { return sin(args[0].Double()); }},
     {"cos", Func { return cos(args[0].Double()); }},
     {"tan", Func { return tan(args[0].Double()); }},
@@ -364,6 +357,7 @@ map<string, bool> keywords = {
     {"if", true},
     {"while", true},
     {"func", true},
+    {"struct", true},
 };
 
 const int is_vector = 0;
@@ -607,7 +601,7 @@ class AST {
         Any& getVar(string name) {
             AST* cur = this;
             if ((fa->element.type == is_func || fa->element.type == is_op) && this == fa->node[0]) {
-                if (fa->element.content == ":=") {
+                if (fa->element.content == ":=" || fa->element.content == "struct") {
                     if (fa->fa->var.find(name) == fa->fa->var.end()) {
                         fa->fa->var[name] = 0;
                     }
@@ -722,6 +716,9 @@ Any AST::Run() {
                 }
                 f.rt = last();
                 return f;
+            } else if (element.content == "struct") {
+                node[0]->getVar(node[0]->element.content) = map<string, Any>();
+                node[1]->Run();
             }
             return nullptr;
         } else {

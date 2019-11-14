@@ -1,5 +1,5 @@
 #!/usr/bin/env gos
-getvar := struct();
+struct (getvar) {
     getvar.Val = 0;
     getvar.at = func() {
         return(this.Val);
@@ -14,9 +14,10 @@ getvar := struct();
             if (is_int(this.Val)) {
                 break;
             } else {
-                print("It's not a integer! ");
+                print("It's not an integer! ");
                 continue;
             }
         }
         return(this.Val);
     }
+}
