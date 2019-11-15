@@ -52,13 +52,13 @@ println();
 
 # Struct
 struct (Box) {
-    Box.length = 0;
-    Box.breadth = 0;
-    Box.height = 0;
-    Box.read = func() {
+    length = 0;
+    breadth = 0;
+    height = 0;
+    read = func() {
         read(this.length, this.breadth, this.height);
     }
-    Box.getVolume = func() {
+    getVolume = func() {
         return(this.length * this.breadth * this.height);
     }
 }
