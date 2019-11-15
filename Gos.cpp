@@ -623,6 +623,10 @@ class AST {
             if (cur->var.find(name) != cur->var.end()) {
                 return cur->var[name];
             }
+            if (fa->fa->fa->element.type == is_func && fa->fa->fa->element.content == "struct") {
+                map<string, Any>& val = *(fa->fa->fa->node[0]->getVar(fa->fa->fa->node[0]->element.content).cast<map<string, Any>>());
+                return val[name];
+            }
             Error("No such variable: " + name, element.line, element.file);
             return var[name];
         }
