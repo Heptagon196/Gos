@@ -614,19 +614,28 @@ class AST {
                     return cur->var[name];
                 }
             }
+            AST *structpos = nullptr;
+#define isStruct(rt) ((rt)->element.type == is_func && (rt)->element.content == "struct")
+            if (isStruct(cur) && structpos == nullptr) {
+                structpos = cur;
+            }
             while (cur != cur->fa) {
                 if (cur->var.find(name) != cur->var.end()) {
                     return cur->var[name];
                 }
                 cur = cur->fa;
+                if (isStruct(cur) && structpos == nullptr) {
+                    structpos = cur;
+                }
             }
             if (cur->var.find(name) != cur->var.end()) {
                 return cur->var[name];
             }
-            if (fa->fa->fa->element.type == is_func && fa->fa->fa->element.content == "struct") {
-                map<string, Any>& val = *(fa->fa->fa->node[0]->getVar(fa->fa->fa->node[0]->element.content).cast<map<string, Any>>());
+            if (structpos != nullptr) {
+                map<string, Any>& val = *(structpos->node[0]->getVar(structpos->node[0]->element.content).cast<map<string, Any>>());
                 return val[name];
             }
+#undef isStruct
             Error("No such variable: " + name, element.line, element.file);
             return var[name];
         }

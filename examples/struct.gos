@@ -4,10 +4,10 @@ struct (Box) {
     breadth = 0;
     height = 0;
     read = func() {
-        read(this.length, this.breadth, this.height);
+        read(length, breadth, height);
     }
     getVolume = func() {
-        return(this.length * this.breadth * this.height);
+        return(length * breadth * height);
     }
 }
 x := Box;

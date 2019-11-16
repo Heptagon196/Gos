@@ -2,22 +2,22 @@
 struct (getvar) {
     Val = 0;
     at = func() {
-        return(this.Val);
+        return(Val);
     }
     getInt = func() {
         while (true) {
             print("Input an integer: ");
-            if (!read(this.Val)) {
+            if (!read(Val)) {
                 println("\nFailed to read.");
                 exit(1);
             }
-            if (is_int(this.Val)) {
+            if (is_int(Val)) {
                 break;
             } else {
                 print("It's not an integer! ");
                 continue;
             }
         }
-        return(this.Val);
+        return(Val);
     }
 }
