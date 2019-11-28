@@ -159,12 +159,14 @@ map<string, function<Any(vector<Any>)>> funcs = {
     {"!", Func { return args[0].Int() ? 0 : 1; }},
     {"~", Func { return ~args[0].Int(); }},
     {"=", Func {
+        /*
         if (args[0].GetType() == typeid(Reference)) {
             Any tmp;
             tmp.LinkTo(args[0].cast<Reference>()->val);
             tmp.Assign(args[1]);
             return args[0];
         }
+        */
         args[0].Assign(args[1]);
         return args[0];
     }},
@@ -345,6 +347,14 @@ map<string, function<Any(vector<Any>)>> funcs = {
     }},
     {"ref", Func {
         return (Reference){args[0].getRef()};
+    }},
+    {"val", Func {
+        if (args[0].GetType() == typeid(Reference)) {
+            return Any(args[0].cast<Reference>()->val);
+        } else {
+            cerr << "Not a reference.";
+            exit(1);
+        }
     }},
     {"global", Func {
         args[0].Assign(args[1]);

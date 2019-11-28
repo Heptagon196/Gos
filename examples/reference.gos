@@ -2,7 +2,7 @@
 # Reference
 x := func(a, b) {
     a = 3;
-    b = 4;
+    val(b) = 4;
     return(0);
 }
 a := 1;

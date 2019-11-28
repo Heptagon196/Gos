@@ -21,6 +21,7 @@ class Any {
     public:
         Any() : isconst(false) {};
         template<typename T> Any(const T& val) : isconst(false) { *x = val; };
+        Any(shared_ptr<any> x) : x(x) {}
         template<typename T> Any& operator = (const T& val);
         template<typename T> T* cast() {
             return any_cast<T>(x.get());
