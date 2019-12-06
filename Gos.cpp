@@ -428,6 +428,13 @@ void removeSpaces(string& s) {
     }
 }
 
+Any& safeGet(map<string, Any>& gosStruct, const string& name, Element& element) {
+    if (gosStruct.find(name) == gosStruct.end()) {
+        Error("No such member: " + name, element.line, element.file);
+    }
+    return gosStruct[name];
+}
+
 Element get_token() {
     static int last_token_type = -1;
     int ch, type;
@@ -590,6 +597,7 @@ class AST {
         AST* last() {
             return node[node.size() - 1];
         }
+        Any& expand();
         void newNode(const Element& token) {
             node.push_back(new AST(token));
             last()->fa = this;
@@ -611,7 +619,7 @@ class AST {
         Any& getVar(string name) {
             AST* cur = this;
             if ((fa->element.type == is_func || fa->element.type == is_op) && this == fa->node[0]) {
-                if (fa->element.content == ":=" || fa->element.content == "struct") {
+                if ((fa->element.content == ":=" && !(fa->fa->fa->element.type == is_func && fa->fa->fa->element.content == "struct")) || fa->element.content == "struct") {
                     if (fa->fa->var.find(name) == fa->fa->var.end()) {
                         fa->fa->var[name] = 0;
                     }
@@ -643,7 +651,10 @@ class AST {
             }
             if (structpos != nullptr) {
                 map<string, Any>& val = *(structpos->node[0]->getVar(structpos->node[0]->element.content).cast<map<string, Any>>());
-                return val[name];
+                if ((fa->element.type == is_func || fa->element.type == is_op) && this == fa->node[0] && fa->element.content == ":=") {
+                    return val[name];
+                }
+                return safeGet(val, name, element);
             }
 #undef isStruct
             Error("No such variable: " + name, element.line, element.file);
@@ -765,6 +776,22 @@ Any AST::Run() {
     }
 }
 
+Any& AST::expand() {
+    string name = node[0]->element.content == "this" ? this_refers_to : node[0]->element.content;
+    if (name == ".") {
+        Any& gosStruct = node[0]->expand();
+        if (gosStruct.GetType() != typeid(map<string, Any>)) {
+            Error("Not a struct: " + (string)gosStruct.GetType().name(), element.line, element.file);
+        }
+        return safeGet(*gosStruct.cast<map<string, Any>>(), node[1]->element.content, element);
+    }
+    Any& gosStruct = getVar(name);
+    if (gosStruct.GetType() != typeid(map<string, Any>)) {
+        Error("Not a struct: " + (string)gosStruct.GetType().name(), element.line, element.file);
+    }
+    return safeGet(*gosStruct.cast<map<string, Any>>(), node[1]->element.content, element);
+}
+
 function<Any(vector<Any>)> AST::getFunc() {
     if (element.type != is_func && element.type != is_op) {
         Error("Not a function.", element.line, element.file);
@@ -773,7 +800,7 @@ function<Any(vector<Any>)> AST::getFunc() {
         return nullptr;
     }
     if (element.content == ".") {
-        Any& f = (*getVar(node[0]->element.content == "this" ? this_refers_to : node[0]->element.content).cast<map<string, Any>>())[node[1]->element.content];
+        Any& f = expand();
         if (f.GetType() != typeid(GosFunc)) {
             if (f.GetType() == typeid(vector<Any>)) {
                 return [&](vector<Any> args) -> Any {
@@ -818,7 +845,7 @@ function<Any(vector<Any>)> AST::getFunc() {
                 if (element.content != "this") {
                     this_refers_to = element.content;
                 }
-                Any &t = (*f.cast<map<string, Any>>())["at"];
+                Any &t = safeGet(*f.cast<map<string, Any>>(), "at", element);
                 vector<Any>& vec = t.cast<GosFunc>()->f;
                 AST *rt = t.cast<GosFunc>()->rt;
                 CallFunction();

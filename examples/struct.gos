@@ -1,12 +1,12 @@
 #!/usr/bin/env gos
 struct (Box) {
-    length = 0;
-    breadth = 0;
-    height = 0;
-    read = func() {
+    length := 0;
+    breadth := 0;
+    height := 0;
+    read := func() {
         read(length, breadth, height);
     }
-    getVolume = func() {
+    getVolume := func() {
         return(length * breadth * height);
     }
 }

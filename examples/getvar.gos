@@ -1,10 +1,10 @@
 #!/usr/bin/env gos
 struct (getvar) {
-    Val = 0;
-    at = func() {
+    Val := 0;
+    at := func() {
         return(Val);
     }
-    getInt = func() {
+    getInt := func() {
         while (true) {
             print("Input an integer: ");
             if (!read(Val)) {
