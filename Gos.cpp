@@ -1014,13 +1014,20 @@ void Gos::ImportDefaultLib() {
     root->addConst("NULL", 0);
     root->addConst("EOF", -1);
     root->addConst("BLACK", BLACK);
-    root->addConst("BLUE", BLUE);
-    root->addConst("GREEN",  GREEN);
-    root->addConst("CYAN", CYAN);
     root->addConst("RED", RED);
-    root->addConst("PURPLE", RED);
+    root->addConst("GREEN",  GREEN);
     root->addConst("YELLOW", YELLOW);
-    root->addConst("WHITE", WHITE);
+    root->addConst("BLUE", BLUE);
+    root->addConst("MAGENTA", MAGENTA);
+    root->addConst("CYAN", CYAN);
+    root->addConst("LIGHT_GRAY", LIGHT_GRAY);
+    root->addConst("DARK_GRAY", DARK_GRAY);
+    root->addConst("LIGHT_RED", LIGHT_RED);
+    root->addConst("LIGHT_GREEN", LIGHT_GREEN);
+    root->addConst("LIGHT_YELLOW", LIGHT_YELLOW);
+    root->addConst("LIGHT_BLUE", LIGHT_BLUE);
+    root->addConst("LIGHT_MAGENTA", LIGHT_MAGENTA);
+    root->addConst("LIGHT_CYAN", LIGHT_CYAN);
 #if defined(linux) || defined(__APPLE__)
     root->addConst("LINUX", 1);
 #else
