@@ -1028,6 +1028,7 @@ void Gos::ImportDefaultLib() {
     root->addConst("LIGHT_BLUE", LIGHT_BLUE);
     root->addConst("LIGHT_MAGENTA", LIGHT_MAGENTA);
     root->addConst("LIGHT_CYAN", LIGHT_CYAN);
+    root->addConst("WHITE", WHITE);
 #if defined(linux) || defined(__APPLE__)
     root->addConst("LINUX", 1);
 #else
