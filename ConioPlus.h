@@ -10,14 +10,22 @@
 #include <cstdio>
 #include <cstdlib>
 
-const int BLACK = 0;
-const int BLUE  = 4;
-const int GREEN = 6;
-const int CYAN = 2;
-const int RED = 1;
-const int PURPLE = 5;
-const int YELLOW = 3;
-const int WHITE = 7;
+const int BLACK = 30;
+const int RED = 31;
+const int GREEN = 32;
+const int YELLOW = 33;
+const int BLUE = 34;
+const int MAGENTA = 35;
+const int CYAN = 36;
+const int LIGHT_GRAY = 37;
+const int DARK_GRAY = 90;
+const int LIGHT_RED = 91;
+const int LIGHT_GREEN = 92;
+const int LIGHT_YELLOW = 93;
+const int LIGHT_BLUE = 94;
+const int LIGHT_MAGENTA = 95;
+const int LIGHT_CYAN = 96;
+const int WHITE = 97;
 
 bool kbhit();
 int getch();
@@ -29,13 +37,21 @@ int getch();
 #include <time.h>
 
 const int BLACK = 0;
-const int BLUE = 9;
-const int GREEN = 10;
-const int CYAN = 11;
-const int RED = 12;
-const int PURPLE = 13;
-const int YELLOW = 14;
-const int WHITE = 15;
+const int RED = 4;
+const int GREEN = 2;
+const int YELLOW = 6;
+const int BLUE = 1;
+const int MAGENTA = 5;
+const int CYAN = 3;
+const int LIGHT_GRAY = 15;
+const int DARK_GRAY = 8;
+const int LIGHT_RED = 12;
+const int LIGHT_GREEN = 10;
+const int LIGHT_YELLOW = 14;
+const int LIGHT_BLUE = 9;
+const int LIGHT_MAGENTA = 13;
+const int LIGHT_CYAN = 11;
+const int WHITE = 7;
 
 #define kbhit _kbhit
 #define getch _getch

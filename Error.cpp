@@ -10,7 +10,7 @@ void __Error(string msg) {
 }
 
 void __Warning(string msg) {
-    color(PURPLE, BLACK);
+    color(MAGENTA, BLACK);
     cout << "Warning: ";
     clearcolor();
     cout << msg << endl;

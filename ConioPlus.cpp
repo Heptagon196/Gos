@@ -62,7 +62,7 @@ void showcursor() {
 }
 
 void color(int a, int b) {
-    printf("\033[%dm\033[%dm", b + 40, a + 30);
+    printf("\033[%dm\033[%dm", b + 10, a);
 }
 
 void clearcolor() {
