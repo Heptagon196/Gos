@@ -1,4 +1,4 @@
-#include "GosVM.h"
+#include "Gos.h"
 #include "Reflection/ReflMgrInit.h"
 #include <iostream>
 #include <fstream>
@@ -24,7 +24,7 @@ struct IO {
     }
 };
 
-int main(int argc, char* argv[]) {
+int vmTest(int argc, char* argv[]) {
     ReflMgrTool::Init();
     auto& refl = ReflMgr::Instance();
     refl.AddClass<IO>();
@@ -35,7 +35,8 @@ int main(int argc, char* argv[]) {
     refl.AddMethod(MethodType<void, IO, int&>::Type(&IO::read), "read");
     refl.AddMethod(MethodType<void, IO, std::string&>::Type(&IO::read), "read");
     refl.AddStaticMethod(TypeID::get<IO>(), &IO::Hello, "hello");
-    GosVM::VMProgram program;
+    GosVM::RTConst constArea;
+    GosVM::VMProgram program(&constArea);
     std::ifstream fin;
     if (argc > 1) {
         fin.open(argv[1]);
@@ -46,10 +47,27 @@ int main(int argc, char* argv[]) {
     fin.close();
     // program.Write(std::cout, true);
     auto ret = program.Execute();
+    /*
     auto v = refl.New("Virtual");
     v.Invoke("print", {});
     v.GetField("x").As<int>() = 2333;
     v.Invoke("print", {});
     std::cout << v.GetField("x") << std::endl;
+    */
+    return 0;
+}
+
+int main(int argc, char* argv[]) {
+    std::ifstream fin;
+    const char* name;
+    if (argc > 1) {
+        name = argv[1];
+    } else {
+        name = "1.gos";
+    }
+    fin.open(name);
+    Gos::GosScript script;
+    script.Read(fin, name);
+    fin.close();
     return 0;
 }

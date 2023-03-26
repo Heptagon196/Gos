@@ -6,16 +6,19 @@ namespace GosVM {
     struct OperatorInfo {
         std::string name;
     };
-    const inline int operatorsCount = 25;
+    const inline int operatorsCount = 27;
     const inline OperatorInfo operatorInfos[] = {
         {"EOF"}, // NONE,
 
         {"class"}, // DEF_CLASS,
         {"decl_var"}, // DEF_MEMBER_VAR,
         {"decl_func"}, // DEF_MEMBER_FUNC,
+        {"static_var"}, // DEF_STATIC_VAR,
+        {"static_func"}, // DEF_STATIC_FUNC,
 
         {"str"}, // STR,
         {"num"}, // NUM,
+        {"namespace"}, // NS,
         {"new"}, // NEW,
         {"new_str"}, // NEW_STR,
         {"new_num"}, // NEW_NUM,
@@ -38,7 +41,6 @@ namespace GosVM {
         {"if"}, // IF,
 
         {"call"}, // CALL,
-        {"call_static"}, // CALL_STATIC,
     };
 }
 
@@ -143,11 +145,7 @@ template<typename T> T GosVM::IRTokenizer::TokenTo(std::string token) {
     return i;
 }
 
-GosVM::VMProgram::VMProgram(): content("") {
-    mem.mem.push_back(SharedObject::Null);
-}
-
-GosVM::VMProgram::VMProgram(std::string content): content(content) {
+GosVM::VMProgram::VMProgram(GosVM::RTConst* constArea): content(""), cst(constArea) {
     mem.mem.push_back(SharedObject::Null);
 }
 
@@ -188,7 +186,7 @@ void GosVM::VMProgram::AddParamDouble(double param) {
 }
 
 void GosVM::VMProgram::AddParamString(std::string param) {
-    AddParamInt(cst.getStrID(param));
+    AddParamInt(cst->getStrID(param));
 }
 
 void GosVM::VMProgram::AddParamClass(int64_t param) {}
@@ -259,7 +257,7 @@ GosVM::RTMemory& GosVM::VMProgram::getMem() {
 }
 
 GosVM::RTConst& GosVM::VMProgram::getConst() {
-    return cst;
+    return *cst;
 }
 
 std::string& GosVM::VMProgram::getContent() {
@@ -304,16 +302,32 @@ void GosVM::VMProgram::Read(std::istream& input, bool prettified) {
                 while (len--) {
                     AddParamString(tokenizer.GetToken());
                 }
+                AddParamInt(tokenizer.GetToken<int>());
+            } else if (op == DEF_STATIC_VAR) {
+                AddParamString(tokenizer.GetToken());
+                AddParamString(tokenizer.GetToken());
+            } else if (op == DEF_STATIC_FUNC) {
+                AddParamString(tokenizer.GetToken());
+                AddParamString(tokenizer.GetToken());
+                int len = tokenizer.GetToken<int>();
+                AddParamInt(len);
+                while (len--) {
+                    AddParamString(tokenizer.GetToken());
+                }
+                AddParamInt(tokenizer.GetToken<int>());
             } else if (op == STR) {
                 int id = tokenizer.GetToken<int>();
                 [[maybe_unused]] int len = tokenizer.GetToken<int>();
                 std::string s = tokenizer.GetToken();
-                cst.setStrID(s, id);
+                cst->setStrID(s, id);
             } else if (op == NUM) {
                 int id = tokenizer.GetToken<int>();
                 RTConstNum num;
                 num.data.i64 = tokenizer.GetToken<int64_t>();
-                cst.setNumID(num, id);
+                cst->setNumID(num, id);
+            } else if (op == NS) {
+                AddParamString(tokenizer.GetToken());
+                AddParamInt(tokenizer.GetToken<int>());
             } else if (op == NEW) {
                 AddParamString(tokenizer.GetToken());
                 AddParamInt(tokenizer.GetToken<int>());
@@ -334,7 +348,7 @@ void GosVM::VMProgram::Read(std::istream& input, bool prettified) {
                     case 3: ss >> num.data.f; break;
                     case 4: ss >> num.data.d; break;
                 }
-                AddParamInt(cst.getNumID(num));
+                AddParamInt(cst->getNumID(num));
             } else if (op == MOV) {
                 AddParamInt(tokenizer.GetToken<int>());
                 AddParamInt(tokenizer.GetToken<int>());
@@ -384,14 +398,6 @@ void GosVM::VMProgram::Read(std::istream& input, bool prettified) {
                 for (int i = 0; i < cnt; i++) {
                     AddParamInt(tokenizer.GetToken<int>());
                 }
-            } else if (op == CALL_STATIC) {
-                AddParamString(tokenizer.GetToken());
-                AddParamString(tokenizer.GetToken());
-                int cnt = tokenizer.GetToken<int>();
-                AddParamInt(cnt);
-                for (int i = 0; i < cnt; i++) {
-                    AddParamInt(tokenizer.GetToken<int>());
-                }
             }
         }
     } else {
@@ -423,7 +429,22 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
                 while (len--) {
                     out << GetParamString() << ' ';
                 }
-                out << std::endl;
+                out << GetParamInt() << std::endl;
+            } else if (op == DEF_STATIC_VAR) {
+                out << GetParamString() << ' ';
+                out << GetParamString() << std::endl;
+            } else if (op == DEF_STATIC_FUNC) {
+                out << GetParamString() << std::endl;
+                out << GetParamString() << ' ';
+                int len = GetParamInt();
+                out << len << ' ';
+                while (len--) {
+                    out << GetParamString() << ' ';
+                }
+                out << GetParamInt() << std::endl;
+            } else if (op == NS) {
+                out << GetParamString() << ' ';
+                out << GetParamInt() << std::endl;
             } else if (op == NEW) {
                 out << GetParamString() << ' ';
                 out << GetParamInt() << std::endl;
@@ -493,15 +514,6 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
                     out << GetParamInt() << ' ';
                 }
                 out << std::endl;
-            } else if (op == CALL_STATIC) {
-                out << GetParamString() << ' ';
-                out << GetParamString() << ' ';
-                int cnt = GetParamInt();
-                out << cnt << ' ';
-                while (cnt--) {
-                    out << GetParamInt() << ' ';
-                }
-                out << std::endl;
             }
         }
     } else {
@@ -530,7 +542,8 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
     }
 }
 
-std::map<TypeID, GosVM::GosClass> GosVM::GosClass::classInfo = {};
+std::unordered_map<TypeID, GosVM::GosClass> GosVM::GosClass::classInfo;
+std::unordered_map<TypeID, std::unordered_map<std::string, SharedObject>> GosVM::GosClass::staticVars;
 
 void GosVM::RTMemory::NewVar(int id, SharedObject obj) {
     if (id < mem.size()) {
@@ -597,7 +610,36 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             refl.RawAddMethod(cls, name, ret, typeList, [func](ObjectPtr instance, const std::vector<ObjectPtr>& params) {
                 return func->Execute(instance, params);
             });
-            return SharedObject::Null;
+            int jmp = GetParamInt();
+            readProgress += jmp;
+        } else if (op == DEF_STATIC_VAR) {
+            TypeID type = ReflMgr::GetType(GetParamString());
+            std::string& name = GetParamString();
+            GosClass::staticVars[cls][name] = refl.New(type);
+            SharedObject* obj = &GosClass::staticVars[cls][name];
+            refl.RawAddStaticField(cls, name, [obj]() {
+                return *obj;
+            });
+        } else if (op == DEF_STATIC_FUNC) {
+            std::string& name = GetParamString();
+            std::string& retName = GetParamString();
+            TypeID ret = ReflMgr::GetType(retName);
+            ArgsTypeList typeList;
+            int cnt = GetParamInt();
+            for (int i = 0; i < cnt; i++) {
+                typeList.push_back(ReflMgr::GetType(GetParamString()));
+            }
+            clsInfo->method[name] = VMFunction(this, readProgress);
+            auto* func = &clsInfo->method[name];
+            refl.RawAddStaticMethod(cls, name, ret, typeList, [func](const std::vector<ObjectPtr>& params) {
+                return func->Execute(ObjectPtr::Null, params);
+            });
+            int jmp = GetParamInt();
+            readProgress += jmp;
+        } else if (op == NS) {
+            auto& type = GetParamString();
+            int id = GetParamInt();
+            memMgr.NewVar(id, SharedObject{ refl.GetType(type), nullptr });
         } else if (op == NEW) {
             auto& type = GetParamString();
             int id = GetParamInt();
@@ -691,17 +733,182 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                 params.push_back(mem[p]);
             }
             mem[0] = mem[i].Invoke(func, params);
-        } else if (op == CALL_STATIC) {
-            std::string& type = GetParamString();
-            std::string& func = GetParamString();
-            std::vector<ObjectPtr> params;
-            int cnt = GetParamInt();
-            while (cnt--) {
-                int p = GetParamInt();
-                params.push_back(mem[p]);
-            }
-            mem[0] = refl.InvokeStatic(refl.GetType(type), func, params);
         }
     }
     return SharedObject::Null;
+}
+
+void GosVM::VMProgram::WriteCommandDefClass(const std::string& className) {
+    AddOperation(DEF_CLASS);
+    AddParamString(className);
+}
+
+void GosVM::VMProgram::WriteCommandDefVar(const std::string& type, const std::string& varName) {
+    AddOperation(DEF_MEMBER_VAR);
+    AddParamString(type);
+    AddParamString(varName);
+}
+
+std::function<void(int)> GosVM::VMProgram::WriteCommandDefFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes) {
+    AddOperation(DEF_MEMBER_FUNC);
+    AddParamString(name);
+    AddParamString(retType);
+    int len = paramTypes.size();
+    AddParamInt(len);
+    for (int i = 0; i < len; i++) {
+        AddParamString(paramTypes[i]);
+    }
+    int pos = readProgress;
+    AddParamInt(0);
+    return [this, pos](int jmp) {
+        *(int*)&content[pos] = jmp;
+    };
+}
+
+void GosVM::VMProgram::WriteCommandDefStaticVar(const std::string& type, const std::string& varName) {
+    AddOperation(DEF_STATIC_VAR);
+    AddParamString(type);
+    AddParamString(varName);
+}
+
+std::function<void(int)> GosVM::VMProgram::WriteCommandDefStaticFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes) {
+    AddOperation(DEF_STATIC_FUNC);
+    AddParamString(name);
+    AddParamString(retType);
+    int len = paramTypes.size();
+    AddParamInt(len);
+    for (int i = 0; i < len; i++) {
+        AddParamString(paramTypes[i]);
+    }
+    int pos = readProgress;
+    AddParamInt(0);
+    return [this, pos](int jmp) {
+        *(int*)&content[pos] = jmp;
+    };
+}
+
+void GosVM::VMProgram::WriteCommandNamespace(const std::string& type, int varID) {
+    AddOperation(NS);
+    AddParamString(type);
+    AddParamInt(varID);
+}
+
+void GosVM::VMProgram::WriteCommandNew(const std::string& type, int varID) {
+    AddOperation(NEW);
+    AddParamString(type);
+    AddParamInt(varID);
+}
+
+void GosVM::VMProgram::WriteCommandNewStr(int varID, const std::string& val) {
+    AddOperation(NEW_STR);
+    AddParamInt(varID);
+    AddParamString(val);
+}
+
+void GosVM::VMProgram::WriteCommandNewNum(int8_t type, int varID, RTConstNum num) {
+    AddOperation(NEW_NUM);
+    AddParamByte(type);
+    AddParamInt(varID);
+    AddParamInt(cst->getNumID(num));
+}
+
+void GosVM::VMProgram::WriteCommandMov(int varA, int varB) {
+    AddOperation(MOV);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandArg(int varID, int paramID) {
+    AddOperation(ARG);
+    AddParamInt(varID);
+    AddParamInt(paramID);
+}
+
+void GosVM::VMProgram::WriteCommandGetField(int varID, int sourceVarID, const std::string& fieldName) {
+    AddOperation(GET_FIELD);
+    AddParamInt(varID);
+    AddParamInt(sourceVarID);
+    AddParamString(fieldName);
+}
+
+void GosVM::VMProgram::WriteCommandAdd(int varA, int varB) {
+    AddOperation(ADD);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandSub(int varA, int varB) {
+    AddOperation(SUB);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandMul(int varA, int varB) {
+    AddOperation(MUL);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandDiv(int varA, int varB) {
+    AddOperation(DIV);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandRem(int varA, int varB) {
+    AddOperation(REM);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandXor(int varA, int varB) {
+    AddOperation(XOR);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandAnd(int varA, int varB) {
+    AddOperation(AND);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+void GosVM::VMProgram::WriteCommandOr(int varA, int varB) {
+    AddOperation(OR);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandRet(int varID) {
+    AddOperation(RET);
+    AddParamInt(varID);
+}
+
+std::function<void(int)> GosVM::VMProgram::WriteCommandJmp() {
+    AddOperation(JMP);
+    int pos = readProgress;
+    AddParamInt(0);
+    return [this, pos](int jmp) {
+        *(int*)&content[pos] = jmp;
+    };
+}
+
+std::function<void(int)> GosVM::VMProgram::WriteCommandIf(int varID) {
+    AddOperation(IF);
+    AddParamInt(varID);
+    int pos = readProgress;
+    AddParamInt(0);
+    return [this, pos](int jmp) {
+        *(int*)&content[pos] = jmp;
+    };
+}
+
+void GosVM::VMProgram::WriteCommandCall(int varID, const std::string& func, std::vector<int> paramsID) {
+    AddOperation(CALL);
+    AddParamInt(varID);
+    AddParamString(func);
+    int cnt = paramsID.size();
+    AddParamInt(cnt);
+    for (int i = 0; i < cnt; i++) {
+        AddParamInt(paramsID[i]);
+    }
 }

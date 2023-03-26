@@ -24,10 +24,13 @@ namespace GosVM {
 
         DEF_CLASS,          // CLASS [class name]
         DEF_MEMBER_VAR,     // VAR [type] [name]
-        DEF_MEMBER_FUNC,    // FUNC [name] [return type] [param count] {param type}
+        DEF_MEMBER_FUNC,    // FUNC [name] [return type] [param count] {param type} [jump offset]
+        DEF_STATIC_VAR,     // STATIC_VAR [type] [name]
+        DEF_STATIC_FUNC,    // STATIC_FUNC [name] [return type] [param count] {param type} [jump offset]
 
         STR,                // STR [str id] [str len] {str}
         NUM,                // NUM [val id] [int64]
+        NS,                 // NS [type] [var id]
         NEW,                // NEW [type] [var id]
         NEW_STR,            // NEW_STR [var id] [string]
         NEW_NUM,            // NEW_NUM [i8/i32/i64/f/d] [var id] [value]
@@ -50,7 +53,6 @@ namespace GosVM {
         IF,                 // IF [var id] [int]
 
         CALL,               // CALL [var id] [method name] [param count] {param var id}
-        CALL_STATIC,        // CALL_STATIC [type name] [method name] [param count] {param var id}
     };
     class IRTokenizer {
         private:
@@ -68,11 +70,11 @@ namespace GosVM {
     };
     struct RTConstNum {
         union {
-            int8_t i8;
-            int32_t i32;
-            int64_t i64;
-            float f;
-            double d;
+            int8_t i8;          // 0
+            int32_t i32;        // 1
+            int64_t i64;        // 2
+            float f;            // 3
+            double d;           // 4
         } data;
         bool operator == (const RTConstNum& other) const;
     };
@@ -131,7 +133,7 @@ namespace GosVM {
             friend VMFunction;
             std::string content;
             RTMemory mem;
-            RTConst cst;
+            RTConst* cst;
             RTMemory& getMem() override;
             RTConst& getConst() override;
             std::string& getContent() override;
@@ -146,14 +148,39 @@ namespace GosVM {
             void AddParamString(std::string param);
             void AddParamClass(int64_t param);
         public:
-            VMProgram();
-            VMProgram(std::string content);
+            VMProgram(RTConst* constArea);
             void Read(std::istream& input, bool prettified = true);
+            // returns a function to set jump offset
+            void WriteCommandDefClass(const std::string& className);
+            void WriteCommandDefVar(const std::string& type, const std::string& varName);
+            std::function<void(int)> WriteCommandDefFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
+            void WriteCommandDefStaticVar(const std::string& type, const std::string& varName);
+            std::function<void(int)> WriteCommandDefStaticFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
+            void WriteCommandNamespace(const std::string& type, int varID);
+            void WriteCommandNew(const std::string& type, int varID);
+            void WriteCommandNewStr(int varID, const std::string& val);
+            void WriteCommandNewNum(int8_t type, int varID, RTConstNum num);
+            void WriteCommandMov(int varA, int varB);
+            void WriteCommandArg(int varID, int paramID);
+            void WriteCommandGetField(int varID, int sourceVarID, const std::string& fieldName);
+            void WriteCommandAdd(int varA, int varB);
+            void WriteCommandSub(int varA, int varB);
+            void WriteCommandMul(int varA, int varB);
+            void WriteCommandDiv(int varA, int varB);
+            void WriteCommandRem(int varA, int varB);
+            void WriteCommandXor(int varA, int varB);
+            void WriteCommandAnd(int varA, int varB);
+            void WriteCommandOr(int varA, int varB);
+            void WriteCommandRet(int varID);
+            std::function<void(int)> WriteCommandJmp();
+            std::function<void(int)> WriteCommandIf(int varID);
+            void WriteCommandCall(int varID, const std::string& func, std::vector<int> paramsID);
     };
     class GosClass {
         public:
             std::string className;
-            static std::map<TypeID, GosClass> classInfo;
+            static std::unordered_map<TypeID, GosClass> classInfo;
+            static std::unordered_map<TypeID, std::unordered_map<std::string, SharedObject>> staticVars;
             std::vector<std::pair<TypeID, std::string>> vars;
             std::unordered_map<std::string, VMFunction> method;
             GosClass();

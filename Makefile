@@ -1,4 +1,15 @@
-DEFAULT: Reflection/reflection.o
-	g++ --std=c++20 *.cpp Reflection/reflection.o -o gos
+CXX=g++ --std=c++20
+DEFAULT: Reflection/reflection.o main.o GosVM.o GosTokenizer.o Gos.o
+	$(CXX) Reflection/reflection.o GosVM.o GosTokenizer.o Gos.o main.o -o gos
+clean:
+	rm *.o
 Reflection/reflection.o:
 	cd Reflection&&make link
+main.o: main.cpp
+	$(CXX) -c main.cpp
+GosVM.o: GosVM.cpp
+	$(CXX) -c GosVM.cpp
+Gos.o: Gos.cpp
+	$(CXX) -c Gos.cpp
+GosTokenizer.o: GosTokenizer.cpp
+	$(CXX) -c GosTokenizer.cpp
