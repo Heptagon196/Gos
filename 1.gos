@@ -1,14 +1,14 @@
 import "std"
 class Main {
     var id: string = "hello";
-    func isNumType(object obj) bool {
+    func isNumType(obj: object) bool {
         return obj.type == "int" || obj.type == "double";
     }
-    func main(args: string[]) int {
+    func main(args: string) int {
         var i: int = 0;
         i = 12;
         print(i);
-        var f = lambda(a: int, b: int): bool {
+        var f = lambda(a: int, b: int) bool {
             return a > b;
         };
         for (var i: int = 0; i < 10; i++) {

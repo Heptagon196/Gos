@@ -33,23 +33,8 @@ SharedObject Gos::GosScript::CreateInstance() const {
 
 void Gos::GosScript::Read(std::istream& fin, std::string inputFileName) {
     GosTokenizer tokenizer(fin, inputFileName);
-    GosToken token;
-    while ((token = tokenizer.GetToken()).type != NONE) {
-        std::cout << "[" << GosToken::TokenName[token.type] << "]";
-        if (token.type == SYMBOL) {
-            std::cout << " " << token.str;
-        } else if (token.type == NUMBER) {
-            std::cout << " " << ((std::string[]){ "i8", "i32", "i64", "float", "double" })[token.numType] << " ";
-            if (token.numType < 3) {
-                std::cout << token.num.data.i64;
-            } else if (token.numType == 3) {
-                std::cout << token.num.data.f;
-            } else if (token.numType == 4) {
-                std::cout << token.num.data.d;
-            }
-        } else if (token.type == STRING) {
-            std::cout << " \"" << token.str << "\"";
-        }
-        std::cout << std::endl;
-    }
+    GosASTError::SetFileName(inputFileName);
+    GosAST ast;
+    ast.Build(tokenizer);
+    ast.PrintAST();
 }

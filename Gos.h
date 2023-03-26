@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GosVM.h"
+#include "GosAST.h"
 
 namespace Gos {
     class GosScript {

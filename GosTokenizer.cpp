@@ -1,7 +1,7 @@
 #include <sstream>
 #include "GosTokenizer.h"
 
-#define RESERVED_WORD_COUNT 13
+#define RESERVED_WORD_COUNT 14
 
 const std::string Gos::GosToken::TokenName[] = {
     "import",
@@ -17,6 +17,7 @@ const std::string Gos::GosToken::TokenName[] = {
     "return",
     "break",
     "continue",
+    "as",
     "=",
     "+=",
     "-=",
@@ -52,6 +53,7 @@ const std::string Gos::GosToken::TokenName[] = {
     ";",
     ".",
     ":",
+    "?",
     "(",
     ")",
     "[",
@@ -66,17 +68,72 @@ Gos::GosToken::GosToken(TokenType type, int line) : type(type), line(line) {}
 Gos::GosToken::GosToken(TokenType type, const std::string& str, int line) : type(type), line(line), str(str) {}
 Gos::GosToken::GosToken(TokenType type, int8_t numType, GosVM::RTConstNum num, int line) : type(type), line(line), numType(numType), num(num) {}
 
-Gos::GosTokenizer::GosTokenizer(std::istream& fin, const std::string& inputName) : fin(fin), lineCount(1), inputName(inputName) {}
+std::string Gos::GosToken::ToString() const {
+    if (type == SYMBOL) {
+        return str;
+    } else if (type == NUMBER) {
+        std::stringstream ss;
+        ss << ((std::string[]){ "i8", "i32", "i64", "float", "double" })[numType] << " ";
+        if (numType < 3) {
+            ss << num.data.i64;
+        } else if (numType == 3) {
+            ss << num.data.f;
+        } else if (numType == 4) {
+            ss << num.data.d;
+        }
+        return ss.str();
+    } else if (type == STRING) {
+        return "\"" + str + "\"";
+    }
+    return TokenName[type];
+}
+
+Gos::GosTokenizer::GosTokenizer(std::istream& fin, const std::string& inputName) : fin(fin), lineCount(1), inputName(inputName), pos(0) {
+    GosToken token;
+    while ((token = ReadToken()).type != NONE) {
+        tokens.push_back(token);
+    }
+}
+
+static inline Gos::GosToken NullToken = { Gos::NONE, -1 };
+
+const Gos::GosToken& Gos::GosTokenizer::GetToken() {
+    if (pos >= tokens.size()) {
+        return NullToken;
+    }
+    return tokens[pos++];
+}
+
+void Gos::GosTokenizer::SetErrorCallback(std::function<bool()> callback) {
+    errorCallback = callback;
+}
 
 void Gos::GosTokenizer::EatToken(Gos::TokenType type) {
     auto recv = GetToken();
     if (recv.type != type) {
-        std::cerr << "Error: " << inputName << ": " << lineCount << ": invalid token: expected \"" << GosToken::TokenName[type] << "\" but \"" << GosToken::TokenName[recv.type] << "\" found" << std::endl;
+        if (errorCallback != 0) {
+            if (!errorCallback()) {
+                return;
+            }
+        }
+        std::cerr << "Error: " << inputName << ": " << recv.line << ": invalid token: expected \"" << GosToken::TokenName[type] << "\" but \"" << recv.ToString() << "\" found" << std::endl;
     }
 }
 
-void Gos::GosTokenizer::BackToken(const GosToken& token) {
-    st.push(token);
+void Gos::GosTokenizer::BackToken() {
+    pos--;
+}
+
+int Gos::GosTokenizer::GetProgress() {
+    return pos;
+}
+
+void Gos::GosTokenizer::RestoreProgress(int progress) {
+    pos = progress;
+}
+
+bool Gos::GosTokenizer::IsEOF() {
+    return pos >= tokens.size() || (pos > 0 && tokens[pos - 1].type == NONE);
 }
 
 #define TRY_GET(a, b)               \
@@ -88,12 +145,7 @@ void Gos::GosTokenizer::BackToken(const GosToken& token) {
         return { b, lineCount };    \
     }
 
-Gos::GosToken Gos::GosTokenizer::GetToken() {
-    if (!st.empty()) {
-        auto ret = st.top();
-        st.pop();
-        return ret;
-    }
+Gos::GosToken Gos::GosTokenizer::ReadToken() {
     char ch = 0;
     while (!ch) {
         ch = fin.get();
@@ -231,6 +283,8 @@ Gos::GosToken Gos::GosTokenizer::GetToken() {
         return { SEM, lineCount };
     } else if (ch == ':') {
         return { COLON, lineCount };
+    } else if (ch == '?') {
+        return { QUESTION, lineCount };
     } else if (ch == '(') {
         return { L_ROUND, lineCount };
     } else if (ch == ')') {

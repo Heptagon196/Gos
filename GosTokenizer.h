@@ -18,6 +18,7 @@ namespace Gos {
         RETURN,
         BREAK,
         CONTINUE,
+        AS,
         ASSIGN,
         ASSIGN_ADD,
         ASSIGN_SUB,
@@ -53,6 +54,7 @@ namespace Gos {
         SEM,
         DOT,
         COLON,
+        QUESTION,
         L_ROUND,
         R_ROUND,
         L_SQUARE,
@@ -73,17 +75,25 @@ namespace Gos {
         GosToken(TokenType type, int line);
         GosToken(TokenType type, const std::string& str, int line);
         GosToken(TokenType type, int8_t numType, GosVM::RTConstNum num, int line);
+        std::string ToString() const;
     };
     class GosTokenizer {
         private:
             std::istream& fin;
             int lineCount;
             std::string inputName;
-            std::stack<GosToken> st;
+            int pos;
+            std::vector<GosToken> tokens;
+            GosToken ReadToken();
+            std::function<bool()> errorCallback;
         public:
             GosTokenizer(std::istream& fin, const std::string& inputName);
-            GosToken GetToken();
-            void BackToken(const GosToken& token);
+            const GosToken& GetToken();
+            int GetProgress();
+            void RestoreProgress(int progress);
+            void BackToken();
             void EatToken(TokenType type);
+            void SetErrorCallback(std::function<bool()> callback);
+            bool IsEOF();
     };
 }
