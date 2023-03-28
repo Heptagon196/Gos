@@ -14,6 +14,7 @@ namespace Gos {
             GosScript();
             void SetScriptName(const std::string& name);
             void Read(std::istream& fin, std::string inputFileName = "");
+            void PrintIR(std::ostream& fout, bool prettify = true);
             SharedObject Execute(ObjectPtr instance = {}, const std::vector<ObjectPtr>& params = {});
             const GosVM::GosClass& GetClassInfo() const;
             SharedObject CreateInstance() const;

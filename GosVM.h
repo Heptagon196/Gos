@@ -22,19 +22,23 @@ namespace GosVM {
     enum VMOperator {
         NONE,
 
-        DEF_CLASS,          // CLASS [class name]
+        DEF_CLASS,          // CLASS [class name] [inherit count] {inherits}
+        ATTR,               // ATTR [attr name] [param count] {params}
         DEF_MEMBER_VAR,     // VAR [type] [name]
         DEF_MEMBER_FUNC,    // FUNC [name] [return type] [param count] {param type} [jump offset]
         DEF_STATIC_VAR,     // STATIC_VAR [type] [name]
         DEF_STATIC_FUNC,    // STATIC_FUNC [name] [return type] [param count] {param type} [jump offset]
 
+        ALLOC,              // ALLOC [size]
         STR,                // STR [str id] [str len] {str}
         NUM,                // NUM [val id] [int64]
         NS,                 // NS [type] [var id]
-        NEW,                // NEW [type] [var id]
+        NEW,                // NEW [type] [var id] [param count] {params}
         NEW_STR,            // NEW_STR [var id] [string]
         NEW_NUM,            // NEW_NUM [i8/i32/i64/f/d] [var id] [value]
         MOV,                // MOV [var id] [var id]
+        REF,                // REF [var id] [var id]
+        CLONE,              // CLONE [var id] [var id]
         ARG,                // ARG [var id] [int]
         GET_FIELD,          // GET_FIELD [var id] [var id] [name]
 
@@ -47,6 +51,7 @@ namespace GosVM {
         AND,                // AND [var id] [var id]
         OR,                 // OR [var id] [var id]
         XOR,                // XOR [var id] [var id]
+        NOT,                // NOT [var id]
 
         RET,                // RET [var id]
         JMP,                // JMP [int]
@@ -97,8 +102,8 @@ namespace GosVM {
         private:
             std::string* curContent;
         protected:
-            int readProgress;
             int startPos, endPos;
+            int readProgress;
             void StartRead();
             char& GetOperation();
             char& GetParamBool();
@@ -115,23 +120,26 @@ namespace GosVM {
             virtual RTConst& getConst() = 0;
             virtual std::string& getContent() = 0;
             void Write(std::ostream& out, bool prettified = true);
-            SharedObject Execute(ObjectPtr instance = {}, const std::vector<ObjectPtr>& params = {});
+            virtual SharedObject Execute(ObjectPtr instance = {}, const std::vector<ObjectPtr>& params = {});
     };
     class VMProgram;
     class VMFunction : public VMExecutable {
         private:
             VMExecutable* program;
+            RTMemory* mem;
             RTMemory& getMem() override;
             RTConst& getConst() override;
             std::string& getContent() override;
         public:
             VMFunction();
             VMFunction(VMExecutable* program, int progress);
+            SharedObject Execute(ObjectPtr instance = {}, const std::vector<ObjectPtr>& params = {}) override;
     };
     class VMProgram : public VMExecutable {
         private:
             friend VMFunction;
             std::string content;
+            int readProgress;
             RTMemory mem;
             RTConst* cst;
             RTMemory& getMem() override;
@@ -151,16 +159,18 @@ namespace GosVM {
             VMProgram(RTConst* constArea);
             void Read(std::istream& input, bool prettified = true);
             // returns a function to set jump offset
-            void WriteCommandDefClass(const std::string& className);
+            void WriteCommandDefClass(const std::string& className, const std::vector<std::string>& inherits);
             void WriteCommandDefVar(const std::string& type, const std::string& varName);
             std::function<void(int)> WriteCommandDefFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
             void WriteCommandDefStaticVar(const std::string& type, const std::string& varName);
             std::function<void(int)> WriteCommandDefStaticFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
             void WriteCommandNamespace(const std::string& type, int varID);
-            void WriteCommandNew(const std::string& type, int varID);
+            void WriteCommandNew(const std::string& type, int varID, const std::vector<int>& params);
             void WriteCommandNewStr(int varID, const std::string& val);
             void WriteCommandNewNum(int8_t type, int varID, RTConstNum num);
             void WriteCommandMov(int varA, int varB);
+            void WriteCommandRef(int varA, int varB);
+            void WriteCommandClone(int varA, int varB);
             void WriteCommandArg(int varID, int paramID);
             void WriteCommandGetField(int varID, int sourceVarID, const std::string& fieldName);
             void WriteCommandAdd(int varA, int varB);
@@ -171,10 +181,15 @@ namespace GosVM {
             void WriteCommandXor(int varA, int varB);
             void WriteCommandAnd(int varA, int varB);
             void WriteCommandOr(int varA, int varB);
+            void WriteCommandNot(int varA);
             void WriteCommandRet(int varID);
+            void WriteCommandAttributes(const std::string& attr, const std::vector<std::string>& params);
             std::function<void(int)> WriteCommandJmp();
             std::function<void(int)> WriteCommandIf(int varID);
             void WriteCommandCall(int varID, const std::string& func, std::vector<int> paramsID);
+            std::function<void(int)> WriteAlloc();
+            void WriteFinish();
+            int GetProgress() const;
     };
     class GosClass {
         public:

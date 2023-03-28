@@ -6,12 +6,16 @@ GosVM::RTConst Gos::GosScript::constArea;
 Gos::GosScript::GosScript() : vm(&constArea) {}
 
 void Gos::GosScript::SetScriptName(const std::string& name) {
+    GosASTError::SetFileName(name);
     scriptName = name;
-    std::string className = "";
-    for (int i = 0; i < name.length() && name[i] != '.'; i++) {
-        className += name[i];
+    int pos = name.length() - 1;
+    while (name[pos] != '.' && pos > 0) {
+        pos--;
     }
-    scriptNameClass = TypeID::getRaw(className);
+    if (pos == 0) {
+        pos = name.length();
+    }
+    scriptNameClass = TypeID::getRaw(std::string_view(scriptName).substr(0, pos));
 }
 
 SharedObject Gos::GosScript::Execute(ObjectPtr instance, const std::vector<ObjectPtr>& params) {
@@ -33,8 +37,14 @@ SharedObject Gos::GosScript::CreateInstance() const {
 
 void Gos::GosScript::Read(std::istream& fin, std::string inputFileName) {
     GosTokenizer tokenizer(fin, inputFileName);
-    GosASTError::SetFileName(inputFileName);
+    SetScriptName(inputFileName);
+    Compiler::VMCompiler compiler(vm);
     GosAST ast;
     ast.Build(tokenizer);
+    ast.CompileAST(compiler);
     ast.PrintAST();
+}
+
+void Gos::GosScript::PrintIR(std::ostream& fout, bool prettify) {
+    vm.Write(fout, prettify);
 }

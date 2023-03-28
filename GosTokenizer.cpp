@@ -203,6 +203,7 @@ Gos::GosToken Gos::GosTokenizer::ReadToken() {
         }
         int8_t numType;
         GosVM::RTConstNum num;
+        num.data.i64 = 0;
         if (hasDot) {
             if (ch == 'f') {
                 ss >> num.data.f;

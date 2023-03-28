@@ -1,0 +1,11 @@
+class Lambda {
+    func main() int {
+        var io: IO;
+        var i: int = 1;
+        var f = lambda [] (x: float) float {
+            return x * (x - 1f) / 2f;
+        };
+        io.print(f(10f));
+        return lambda[io](x: int) void { io.print(x); };
+    }
+}

@@ -1,19 +1,5 @@
 #include "GosAST.h"
 
-#define Build(name) name(Gos::GosTokenizer& tokenizer)
-#define Compile() CompileToVM(GosVM::VMProgram& program)
-#define Print() PrintAST(int indent)
-#define TokenList std::vector<GosToken> tokenList;
-
-#define GOS_AST(name, extra)                                \
-class name : public GosAST {                                \
-    public:                                                 \
-    Build(name);                                            \
-    void Compile() override;                                \
-    void Print() override;                                  \
-    extra                                                   \
-}
-
 namespace Gos {
     static inline std::string gosASTFileName;
     static inline int gosASTOffError = 0;
@@ -39,50 +25,29 @@ namespace Gos {
             std::cerr << "Error: " << gosASTFileName << ": " << token.line << ": unexpected token \"" << token.ToString() << "\" instead of \"" << correct.ToString() << "\"" << std::endl;
         }*/
     }
-    namespace AST {
-        GOS_AST(Symbol,);
-        GOS_AST(Number,);
-        GOS_AST(String,);
-        GOS_AST(Primary,);
-        GOS_AST(PostFix,);
-        GOS_AST(Unary,);
-        GOS_AST(Cast,);
-        GOS_AST(Mul, TokenList);
-        GOS_AST(Add, TokenList);
-        GOS_AST(Relation, TokenList);
-        GOS_AST(Equality, TokenList);
-        GOS_AST(LogicAnd, TokenList);
-        GOS_AST(LogicOr, TokenList);
-        GOS_AST(Cond,);
-        GOS_AST(Const,);
-        GOS_AST(Assign,);
-        GOS_AST(Exp,);
-        GOS_AST(DefVar, TokenList);
-        GOS_AST(Statement,);
-        GOS_AST(StatBlock,);
-        GOS_AST(DefArg,);
-        GOS_AST(DefArgList,);
-        GOS_AST(ArgsList,);
-        GOS_AST(LambdaDef,);
-        GOS_AST(ClassDef,);
-        GOS_AST(IDList,);
-        GOS_AST(SingleAttr,);
-        GOS_AST(Attribute,);
-        GOS_AST(Preprocess,);
-    }
 }
 
-#undef Compile
 #undef Build
 #undef Print
 
-void Gos::GosAST::CompileToVM(GosVM::VMProgram& program) {
+int Gos::GosAST::CompileAST(Compiler::VMCompiler& code) {
+    code.SetProgramFileName(gosASTFileName);
+    auto setMemsize = code.vm.WriteAlloc();
     for (auto* ast : nodes) {
-        ast->CompileToVM(program);
+        ast->CompileAST(code);
     }
+    for (int i = 0; i < code.lambdaDefStartPos.size(); i++) {
+        code.vm.WriteCommandJmp()(code.lambdaDefStartPos[i]);
+        code.lambdaDefJumpout[i](code.vm.GetProgress());
+    }
+    setMemsize(code.pos);
+    code.vm.WriteFinish();
+    return 0;
 }
 
 void Gos::GosAST::Build(Gos::GosTokenizer& tokenizer) {
+    gosASTOffError = 0;
+    gosASTHasError = false;
     while (!tokenizer.IsEOF() && !gosASTHasError) {
         nodes.push_back(new AST::Preprocess(tokenizer));
     }
@@ -103,14 +68,14 @@ Gos::GosAST::~GosAST() {
     }
 }
 
-#define Compile(name) void name::CompileToVM(GosVM::VMProgram& program)
 #define Print(name) void name::PrintAST(int indent)
 #define Build(name) name::name(Gos::GosTokenizer& tokenizer)
 #define Expect(name) nodes.push_back(new name(tokenizer))
-#define Log(name) if (gosASTHasError) return; /*std::cout << "Building " << #name << std::endl;*/
+#define Log(name) branch = 0; if (gosASTHasError) return; /*std::cout << "Building " << #name << std::endl;*/
 
 namespace Gos { namespace AST {
     // Build Functions
+    Empty::Empty() {}
     Build(Symbol) {
         Log(Symbol);
         token = tokenizer.GetToken();
@@ -148,29 +113,54 @@ namespace Gos { namespace AST {
     Build(PostFix) {
         Log(PostFix);
         Expect(Primary);
-        token = tokenizer.GetToken();
-        if (token.type == L_SQUARE) {
-            Expect(Exp);
-            tokenizer.EatToken(R_SQUARE);
-        } else if (token.type == L_ROUND) {
-            if (tokenizer.GetToken().type != R_ROUND) {
+        while (true) {
+            GosAST* rt = new Empty();
+            nodes.push_back(rt);
+            rt->token = tokenizer.GetToken();
+            if (rt->token.type == L_SQUARE) {
+                rt->branch = 1;
+                rt->Expect(Exp);
+                tokenizer.EatToken(R_SQUARE);
+            } else if (rt->token.type == L_ROUND) {
+                rt->branch = 2;
+                if (tokenizer.GetToken().type != R_ROUND) {
+                    tokenizer.BackToken();
+                    rt->Expect(ArgsList);
+                    tokenizer.EatToken(R_ROUND);
+                }
+            } else if (rt->token.type == DOT) {
+                rt->branch = 3;
+                rt->Expect(Symbol);
+                if (tokenizer.GetToken().type == L_ROUND) {
+                    rt->branch = 4;
+                    if (tokenizer.GetToken().type != R_ROUND) {
+                        tokenizer.BackToken();
+                        rt->Expect(ArgsList);
+                        tokenizer.EatToken(R_ROUND);
+                    }
+                } else {
+                    tokenizer.BackToken();
+                }
+            } else if (rt->token.type == INC || rt->token.type == DEC) {
+                rt->branch = 5;
+                if (rt->token.type == INC) {
+                    rt->branch = 6;
+                }
+                // DO NOTHING
+            } else {
+                token.type = NONE;
                 tokenizer.BackToken();
-                Expect(ArgsList);
-                tokenizer.EatToken(R_ROUND);
+                delete nodes[nodes.size() - 1];
+                nodes.pop_back();
+                break;
             }
-        } else if (token.type == DOT) {
-            Expect(Symbol);
-        } else if (token.type == INC || token.type == DEC) {
-            // DO NOTHING
-        } else {
-            token.type = NONE;
-            tokenizer.BackToken();
         }
     }
     Build(Unary) {
         Log(Unary);
         token = tokenizer.GetToken();
         if (token.type == ADD || token.type == SUB || token.type == NOT) {
+            branch = 1;
             Expect(Unary);
         } else {
             tokenizer.BackToken();
@@ -258,6 +248,7 @@ namespace Gos { namespace AST {
         Expect(LogicOr);
         token = tokenizer.GetToken();
         if (token.type == QUESTION) {
+            branch = 1;
             Expect(Exp);
             tokenizer.EatToken(COLON);
             Expect(Exp);
@@ -311,11 +302,13 @@ namespace Gos { namespace AST {
         Expect(Symbol);
         token = tokenizer.GetToken();
         if (token.type == COLON) {
+            branch += 1;
             tokenList.push_back(token);
             Expect(Symbol);
             token = tokenizer.GetToken();
         }
         if (token.type == ASSIGN) {
+            branch += 2;
             tokenList.push_back(token);
             Expect(Exp);
         } else {
@@ -326,15 +319,18 @@ namespace Gos { namespace AST {
         Log(Statement);
         token = tokenizer.GetToken();
         if (token.type == VAR) {
+            branch = 1;
             Expect(DefVar);
             tokenizer.EatToken(SEM);
         } else if (token.type == IF) {
+            branch = 2;
             tokenizer.EatToken(L_ROUND);
             Expect(Exp);
             tokenizer.EatToken(R_ROUND);
             Expect(StatBlock);
             GosToken el = tokenizer.GetToken();
             if (el.type == ELSE) {
+                branch = 3;
                 el = tokenizer.GetToken();
                 if (el.type == IF) {
                     tokenizer.BackToken();
@@ -347,11 +343,13 @@ namespace Gos { namespace AST {
                 tokenizer.BackToken();
             }
         } else if (token.type == WHILE) {
+            branch = 4;
             tokenizer.EatToken(L_ROUND);
             Expect(Exp);
             tokenizer.EatToken(R_ROUND);
             Expect(StatBlock);
         } else if (token.type == FOR) {
+            branch = 5;
             tokenizer.EatToken(L_ROUND);
             GosToken v = tokenizer.GetToken();
             if (v.type == VAR) {
@@ -367,6 +365,7 @@ namespace Gos { namespace AST {
             tokenizer.EatToken(R_ROUND);
             Expect(StatBlock);
         } else if (token.type == FOREACH) {
+            branch = 6;
             tokenizer.EatToken(L_ROUND);
             tokenizer.EatToken(VAR);
             Expect(Symbol);
@@ -375,9 +374,11 @@ namespace Gos { namespace AST {
             tokenizer.EatToken(R_ROUND);
             Expect(StatBlock);
         } else if (token.type == RETURN) {
+            branch = 7;
             Expect(Exp);
             tokenizer.EatToken(SEM);
         } else {
+            branch = 8;
             tokenizer.BackToken();
             Expect(Exp);
             tokenizer.EatToken(SEM);
@@ -421,10 +422,21 @@ namespace Gos { namespace AST {
     Build(LambdaDef) {
         Log(LambdaDef);
         tokenizer.EatToken(LAMBDA);
+        if (tokenizer.GetToken().type == L_SQUARE) {
+            if (tokenizer.GetToken().type != R_SQUARE) {
+                tokenizer.BackToken();
+                branch += 1;
+                Expect(IDList);
+                tokenizer.EatToken(R_SQUARE);
+            }
+        } else {
+            tokenizer.BackToken();
+        }
         tokenizer.EatToken(L_ROUND);
         token = tokenizer.GetToken();
         tokenizer.BackToken();
         if (token.type != R_ROUND) {
+            branch += 2;
             Expect(DefArgList);
         }
         tokenizer.EatToken(R_ROUND);
@@ -436,22 +448,28 @@ namespace Gos { namespace AST {
         token = tokenizer.GetToken();
         tokenizer.BackToken();
         if (token.type == L_SQUARE) {
+            branch += 1;
             Expect(Attribute);
         }
         token = tokenizer.GetToken();
         if (token.type == FUNC) {
+            branch += 2;
             Expect(Symbol);
             tokenizer.EatToken(L_ROUND);
             token = tokenizer.GetToken();
             tokenizer.BackToken();
             if (token.type != R_ROUND) {
+                branch += 8;
                 Expect(DefArgList);
             }
             tokenizer.EatToken(R_ROUND);
             Expect(Symbol);
             Expect(StatBlock);
         } else if (token.type == VAR) {
-            Expect(DefVar);
+            branch += 4;
+            Expect(Symbol);
+            tokenizer.EatToken(COLON);
+            Expect(Symbol);
             tokenizer.EatToken(SEM);
         }
     }
@@ -493,16 +511,20 @@ namespace Gos { namespace AST {
         Log(Preprocess);
         token = tokenizer.GetToken();
         if (token.type == IMPORT) {
+            branch = 0;
             Expect(String);
         } else {
+            branch = 1;
             tokenizer.BackToken();
             if (token.type == L_SQUARE) {
+                branch += 2;
                 Expect(Attribute);
             }
             tokenizer.EatToken(CLASS);
             Expect(Symbol);
             token = tokenizer.GetToken();
             if (token.type == COLON) {
+                branch += 4;
                 Expect(IDList);
             } else {
                 tokenizer.BackToken();
@@ -521,12 +543,18 @@ namespace Gos { namespace AST {
     // Print Functions
 
 #define PrintIndent() for (int i = 0; i < indent; i++) std::cout << "  ";
-#define SkipIf(cond) if (cond) { nodes[0]->PrintAST(indent); return; }
+#define SkipIf(cond) if (nodes.size() > 0 && (cond)) { nodes[0]->PrintAST(indent); return; }
 #define PrintName() std::string name = (std::string)TypeID::get<decltype(*this)>().getName(); name = name.substr(10, name.length() - 11); std::cout << name;
 #define PrintNodes() std::cout << std::endl; for (auto* ast : nodes) ast->PrintAST(indent + 1);
 #define PrintToken() std::cout << " " << token.ToString();
 #define PrintTokenList() for (auto t : tokenList) std::cout << " " << t.ToString();
 
+    Print(Empty) {
+        PrintIndent();
+        std::cout << "-";
+        PrintToken();
+        PrintNodes();
+    }
     Print(Symbol) {
         PrintIndent();
         PrintName();
@@ -552,7 +580,7 @@ namespace Gos { namespace AST {
         PrintNodes();
     }
     Print(PostFix) {
-        SkipIf(token.type == NONE);
+        SkipIf(nodes.size() == 1);
         PrintIndent();
         PrintName();
         PrintToken();
@@ -697,35 +725,4 @@ namespace Gos { namespace AST {
         PrintName();
         PrintNodes();
     }
-
-    // Compile Functions
-    Compile(Symbol) {}
-    Compile(Number) {}
-    Compile(String) {}
-    Compile(Primary) {}
-    Compile(PostFix) {}
-    Compile(Unary) {}
-    Compile(Cast) {}
-    Compile(Mul) {}
-    Compile(Add) {}
-    Compile(Relation) {}
-    Compile(Equality) {}
-    Compile(LogicAnd) {}
-    Compile(LogicOr) {}
-    Compile(Cond) {}
-    Compile(Const) {}
-    Compile(Assign) {}
-    Compile(Exp) {}
-    Compile(DefVar) {}
-    Compile(Statement) {}
-    Compile(StatBlock) {}
-    Compile(DefArg) {}
-    Compile(DefArgList) {}
-    Compile(ArgsList) {}
-    Compile(LambdaDef) {}
-    Compile(ClassDef) {}
-    Compile(IDList) {}
-    Compile(SingleAttr) {}
-    Compile(Attribute) {}
-    Compile(Preprocess) {}
 }}

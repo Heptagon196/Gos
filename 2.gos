@@ -1,7 +1,0 @@
-import "std"
-class Main {
-    var id: string = "hello";
-    func isNumType(obj: object) bool {
-        obj = 1;
-    }
-}
