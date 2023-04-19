@@ -57,6 +57,9 @@ namespace GosVM {
         JMP,                // JMP [int]
         IF,                 // IF [var id] [int]
 
+        BOX,                // BOX [var id] [var id]
+        UNBOX,              // UNBOX [var id] [var id]
+
         CALL,               // CALL [var id] [method name] [param count] {param var id}
     };
     class IRTokenizer {
@@ -186,6 +189,8 @@ namespace GosVM {
             void WriteCommandAttributes(const std::string& attr, const std::vector<std::string>& params);
             std::function<void(int)> WriteCommandJmp();
             std::function<void(int)> WriteCommandIf(int varID);
+            void WriteCommandBox(int varA, int varB);
+            void WriteCommandUnbox(int varA, int varB);
             void WriteCommandCall(int varID, const std::string& func, std::vector<int> paramsID);
             std::function<void(int)> WriteAlloc();
             void WriteFinish();

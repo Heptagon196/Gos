@@ -1,12 +1,14 @@
 #include "GosVM.h"
 #include <algorithm>
+#include <stack>
 #include <sstream>
 
 namespace GosVM {
     struct OperatorInfo {
         std::string name;
     };
-    const inline int operatorsCount = 32;
+    const inline int operatorsCount = 34;
+    static inline TagList currentTag;
     const inline OperatorInfo operatorInfos[] = {
         {"EOF"}, // NONE,
 
@@ -44,6 +46,9 @@ namespace GosVM {
         {"ret"}, // RET,
         {"jmp"}, // JMP,
         {"if"}, // IF,
+                //
+        {"box"}, // BOX,
+        {"unbox"}, // UNBOX,
 
         {"call"}, // CALL,
     };
@@ -430,6 +435,12 @@ void GosVM::VMProgram::Read(std::istream& input, bool prettified) {
             } else if (op == IF) {
                 AddParamInt(tokenizer.GetToken<int>());
                 AddParamInt(tokenizer.GetToken<int>());
+            } else if (op == BOX) {
+                AddParamInt(tokenizer.GetToken<int>());
+                AddParamInt(tokenizer.GetToken<int>());
+            } else if (op == UNBOX) {
+                AddParamInt(tokenizer.GetToken<int>());
+                AddParamInt(tokenizer.GetToken<int>());
             } else if (op == CALL) {
                 AddParamInt(tokenizer.GetToken<int>());
                 AddParamString(tokenizer.GetToken());
@@ -460,6 +471,7 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
             if (op == DEF_CLASS) {
                 out << GetParamString() << ' ';
                 int len = GetParamInt();
+                out << len << ' ';
                 while (len--) {
                     out << GetParamString() << ' ';
                 }
@@ -467,6 +479,7 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
             } else if (op == ATTR) {
                 out << GetParamString() << ' ';
                 int len = GetParamInt();
+                out << len << ' ';
                 while (len--) {
                     out << GetParamString() << ' ';
                 }
@@ -574,6 +587,12 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
             } else if (op == IF) {
                 out << GetParamInt() << ' ';
                 out << GetParamInt() << std::endl;
+            } else if (op == BOX) {
+                out << GetParamInt() << ' ';
+                out << GetParamInt() << std::endl;
+            } else if (op == UNBOX) {
+                out << GetParamInt() << ' ';
+                out << GetParamInt() << std::endl;
             } else if (op == CALL) {
                 out << GetParamInt() << ' ';
                 out << GetParamString() << ' ';
@@ -638,7 +657,15 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
     StartRead();
     while (readProgress < curContent->length() && readProgress < endPos) {
         int op = GetOperation();
-        if (op == DEF_CLASS) {
+        if (op == ATTR) {
+            std::string attr = GetParamString();
+            int len = GetParamInt();
+            std::vector<std::string> attrs;
+            while (len--) {
+                attrs.push_back(GetParamString());
+            }
+            currentTag[attr] = attrs;
+        } else if (op == DEF_CLASS) {
             clsName = GetParamString();
             int len = GetParamInt();
             std::vector<std::string> inherits;
@@ -650,7 +677,6 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                 if (GosClass::classInfo.find(cls) == GosClass::classInfo.end()) {
                     GosClass::classInfo[cls] = GosClass(clsName);
                 }
-                // TODO: inherits
                 refl.AddVirtualClass(clsName, [clsName](const std::vector<ObjectPtr>& params) {
                     auto ret = SharedObject::New<GosInstance>();
                     GosInstance& instance = ret.As<GosInstance>();
@@ -663,7 +689,11 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                     }
                     ret.ctor(params);
                     return ret;
-                });
+                }, currentTag);
+                currentTag = {};
+                for (std::string& s : inherits) {
+                    refl.AddVirtualInheritance(clsName, s);
+                }
             }
             clsInfo = &GosClass::classInfo[cls];
         } else if (op == DEF_MEMBER_VAR) {
@@ -673,6 +703,8 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             refl.RawAddField(cls, name, [name](ObjectPtr instance) {
                 return instance.As<GosInstance>().field[name];
             });
+            refl.GetFieldTag(cls, name) = currentTag;
+            currentTag = {};
         } else if (op == DEF_MEMBER_FUNC) {
             std::string& name = GetParamString();
             std::string& retName = GetParamString();
@@ -688,6 +720,8 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             refl.RawAddMethod(cls, name, ret, typeList, [func](ObjectPtr instance, const std::vector<ObjectPtr>& params) {
                 return func->Execute(instance, params);
             });
+            refl.GetMethodInfo(cls, name, typeList) = currentTag;
+            currentTag = {};
             readProgress += jmp;
         } else if (op == DEF_STATIC_VAR) {
             TypeID type = ReflMgr::GetType(GetParamString());
@@ -697,6 +731,8 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             refl.RawAddStaticField(cls, name, [obj]() {
                 return *obj;
             });
+            refl.GetFieldTag(cls, name) = currentTag;
+            currentTag = {};
         } else if (op == DEF_STATIC_FUNC) {
             std::string& name = GetParamString();
             std::string& retName = GetParamString();
@@ -711,6 +747,8 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             refl.RawAddStaticMethod(cls, name, ret, typeList, [func](const std::vector<ObjectPtr>& params) {
                 return func->Execute(ObjectPtr::Null, params);
             });
+            refl.GetMethodInfo(cls, name, typeList) = currentTag;
+            currentTag = {};
             int jmp = GetParamInt();
             readProgress += jmp;
         } else if (op == ALLOC) {
@@ -821,6 +859,14 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             if (mem[a].Get<bool>()) {
                 readProgress += b;
             }
+        } else if (op == BOX) {
+            int a = GetParamInt();
+            int b = GetParamInt();
+            mem[a] = SharedObject::New<SharedObject>(mem[b]);
+        } else if (op == UNBOX) {
+            int a = GetParamInt();
+            int b = GetParamInt();
+            mem[a] = mem[b].As<SharedObject>();
         } else if (op == CALL) {
             int i = GetParamInt();
             std::string& func = GetParamString();
@@ -1032,6 +1078,18 @@ std::function<void(int)> GosVM::VMProgram::WriteCommandIf(int varID) {
     };
 }
 
+void GosVM::VMProgram::WriteCommandBox(int varA, int varB) {
+    AddOperation(BOX);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
+void GosVM::VMProgram::WriteCommandUnbox(int varA, int varB) {
+    AddOperation(UNBOX);
+    AddParamInt(varA);
+    AddParamInt(varB);
+}
+
 void GosVM::VMProgram::WriteCommandCall(int varID, const std::string& func, std::vector<int> paramsID) {
     AddOperation(CALL);
     AddParamInt(varID);
@@ -1044,7 +1102,13 @@ void GosVM::VMProgram::WriteCommandCall(int varID, const std::string& func, std:
 }
 
 void GosVM::VMProgram::WriteCommandAttributes(const std::string& attr, const std::vector<std::string>& params) {
-    // TODO
+    AddOperation(ATTR);
+    AddParamString(attr);
+    int len = params.size();
+    AddParamInt(len);
+    for (int i = 0; i < len; i++) {
+        AddParamString(params[i]);
+    }
 }
 
 void GosVM::VMProgram::WriteFinish() {

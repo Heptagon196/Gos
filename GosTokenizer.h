@@ -5,10 +5,10 @@
 
 namespace Gos {
     enum TokenType {
-        IMPORT,
         CLASS,
         VAR,
         FUNC,
+        NEW,
         LAMBDA,
         FOR,
         FOREACH,
@@ -33,6 +33,7 @@ namespace Gos {
         ADD,
         SUB,
         MUL,
+        ADDR,
         DIV,
         REM,
         XOR,

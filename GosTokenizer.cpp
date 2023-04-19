@@ -4,10 +4,10 @@
 #define RESERVED_WORD_COUNT 14
 
 const std::string Gos::GosToken::TokenName[] = {
-    "import",
     "class",
     "var",
     "func",
+    "new",
     "lambda",
     "for",
     "foreach",
@@ -32,6 +32,7 @@ const std::string Gos::GosToken::TokenName[] = {
     "+",
     "-",
     "*",
+    "&",
     "/",
     "%",
     "^",
@@ -244,8 +245,24 @@ Gos::GosToken Gos::GosTokenizer::ReadToken() {
         return { NUMBER, numType, num, lineCount };
     } else if (ch == '*') {
         TRY_GET(ASSIGN_MUL, MUL);
+    } else if (ch == '#') {
+        while (ch != '\n' && ch != '\r' && ch != EOF) {
+            ch = fin.get();
+        }
+        return ReadToken();
     } else if (ch == '/') {
-        TRY_GET(ASSIGN_DIV, DIV);
+        ch = fin.get();
+        if (ch == '/') {
+            while (ch != '\n' && ch != '\r' && ch != EOF) {
+                ch = fin.get();
+            }
+            return ReadToken();
+        } else if (ch == '=') {
+            return { ASSIGN_DIV, lineCount };
+        } else {
+            fin.unget();
+            return { DIV, lineCount };
+        }
     } else if (ch == '%') {
         TRY_GET(ASSIGN_REM, REM);
     } else if (ch == '^') {
@@ -265,6 +282,7 @@ Gos::GosToken Gos::GosTokenizer::ReadToken() {
         } else {
             if (ch != '&') {
                 fin.unget();
+                return { ADDR, lineCount };
             }
             return { AND, lineCount };
         }

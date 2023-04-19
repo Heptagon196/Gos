@@ -1,5 +1,7 @@
 #include "Gos.h"
 #include "GosTokenizer.h"
+#include <fstream>
+#include <filesystem>
 
 GosVM::RTConst Gos::GosScript::constArea;
 
@@ -42,9 +44,66 @@ void Gos::GosScript::Read(std::istream& fin, std::string inputFileName) {
     GosAST ast;
     ast.Build(tokenizer);
     ast.CompileAST(compiler);
-    ast.PrintAST();
+    // ast.PrintAST();
 }
 
 void Gos::GosScript::PrintIR(std::ostream& fout, bool prettify) {
     vm.Write(fout, prettify);
+}
+
+void Gos::GosProject::PreprocessFile(std::string scriptPath, std::queue<std::string>& imports) {
+    if (vis.count(scriptPath) > 0) {
+        return;
+    }
+    std::ifstream fin;
+    fin.open(scriptPath);
+    vis.insert(scriptPath);
+    std::string line;
+    std::filesystem::path dir = std::filesystem::absolute(scriptPath).parent_path();
+    while (std::getline(fin, line)) {
+        if (line.length() > 8 && line.substr(0, 8) == "#import ") {
+            std::string nxtPath = std::filesystem::relative(dir.append(line.substr(8, line.length() - 8)));
+            PreprocessFile(nxtPath, imports);
+        }
+    }
+    fin.close();
+    imports.push(scriptPath);
+}
+
+void Gos::GosProject::ExecuteFiles(std::queue<std::string>& files) {
+    while (!files.empty()) {
+        std::ifstream fin;
+        std::string scriptPath = files.front();
+        std::cout << "Gos: Import " << scriptPath << std::endl;
+        files.pop();
+        fin.open(scriptPath);
+        GosScript& script = scripts[scriptPath];
+        script.Read(fin, scriptPath);
+        fin.close();
+        script.Execute();
+    }
+}
+
+void Gos::GosProject::ScanDirectory(std::string directory, std::function<bool(std::string)> filter) {
+    std::queue<std::string> imports;
+    std::queue<std::filesystem::path> dirs;
+    dirs.push(directory);
+    while (!dirs.empty()) {
+        for (auto& file: std::filesystem::directory_iterator(dirs.front())) {
+            if (std::filesystem::is_directory(file.status())) {
+                dirs.push(file.path());
+            }
+            if (filter(file.path())) {
+                PreprocessFile(std::filesystem::relative(file.path()), imports);
+            }
+        }
+        dirs.pop();
+    }
+    ExecuteFiles(imports);
+}
+
+void Gos::GosProject::AddScript(std::string scriptPath) {
+    std::queue<std::string> imports;
+    PreprocessFile(std::filesystem::relative(scriptPath), imports);
+    ExecuteFiles(imports);
 }

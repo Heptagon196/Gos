@@ -1,9 +1,0 @@
-class Test2 {
-    var i: int;
-    func main() int {
-        var io: IO;
-        var b: int;
-        this.i = b;
-        io.print(i);
-    }
-}

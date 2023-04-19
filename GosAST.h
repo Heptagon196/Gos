@@ -17,11 +17,10 @@ namespace Gos {
             int* pos;
             std::unordered_map<std::string, int> varID;
             std::unordered_map<std::string, std::string> varType;
-            int GetVarID(const std::string& name);
+            int GetVarID(const std::string& name, std::string& errorInfo);
             std::string GetVarType(const std::string& name);
         };
         struct VMCompiler {
-            static int lambdaCount;
             Scope mainScope;
             Scope* currentScope;
             int pos;

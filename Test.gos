@@ -1,8 +1,8 @@
 class Fib {
     var io: IO;
     var n: int;
-    func __ctor() void {
-        this.io.read(this.n);
+    func __ctor(n: int) void {
+        this.n = n;
     }
     func fib(n: int) int {
         if (n > 2) {
@@ -11,7 +11,7 @@ class Fib {
         return 1;
     }
     func __call() int {
-        return this.fib(this.n);
+        return this.fib(n);
     }
 }
 
@@ -19,6 +19,7 @@ class Test {
     var io: IO;
     func main() int {
         var fib: Fib;
-        this.io.print(fib());
+        io.print(fib());
+        return lambda[](x: int) void {};
     }
 }

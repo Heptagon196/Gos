@@ -3,15 +3,21 @@
 
 static inline std::string compilingFileName;
 static inline int compilingLine;
+static inline std::string compilingClassName;
+static inline std::vector<std::string> compilingClassVars;
+static inline std::vector<std::string> compilingClassVarTypes;
+static inline std::unordered_map<std::string, int> compilingClassVarID;
 
-int Gos::Compiler::Scope::GetVarID(const std::string& name) {
+int Gos::Compiler::Scope::GetVarID(const std::string& name, std::string& errorInfo) {
     if (varID.find(name) != varID.end()) {
         return varID[name];
     }
     if (fa != nullptr) {
-        return fa->GetVarID(name);
+        return fa->GetVarID(name, errorInfo);
     }
-    std::cerr << "Error: " << compilingFileName << ": " << compilingLine << ": no such variable: " << name << std::endl;
+    std::stringstream ss;
+    ss << "Error: " << compilingFileName << ": " << compilingLine << ": no such variable: " << name;
+    errorInfo = ss.str();
     return 0;
 }
 
@@ -70,27 +76,46 @@ Gos::Compiler::VMCompiler::VMCompiler(GosVM::VMProgram& program) : pos(1), vm(pr
 #define pc code.pos
 #define scope code.currentScope
 
-#define START() compilingLine = token.line;
+#define START()                     \
+    compilingLine = token.line;     \
+    if (nodes.size() == 0) {        \
+        return 0;                   \
+    }
 
 // Compile Functions
 
 Compile(Empty) { return 0; }
 
 Compile(Symbol) { 
-    START();
-    int ret = code.currentScope->GetVarID(token.str);
+    compilingLine = token.line;
+    std::string errorInfo = "";
+    int ret = code.currentScope->GetVarID(token.str, errorInfo);
+    if (errorInfo.size() > 0) {
+        if (compilingClassVarID.find(token.str) != compilingClassVarID.end()) {
+            return compilingClassVarID[token.str];
+        }
+        for (std::string& s : compilingClassVars) {
+            if (s == token.str) {
+                int tmp = code.GetTmpVar();
+                vm.WriteCommandGetField(tmp, 1, token.str);
+                compilingClassVarID[token.str] = tmp;
+                return tmp;
+            }
+        }
+        std::cerr << errorInfo << std::endl;
+    }
     return ret;
 }
 
 Compile(Number) {
-    START();
+    compilingLine = token.line;
     int id = pc++;
     vm.WriteCommandNewNum(token.numType, id, token.num);
     return id;
 }
 
 Compile(String) {
-    START();
+    compilingLine = token.line;
     int id = pc++;
     vm.WriteCommandNewStr(id, token.str);
     return id;
@@ -98,6 +123,18 @@ Compile(String) {
 
 Compile(Primary) {
     START();
+    if (branch & 1) {
+        std::vector<int> params;
+        if (branch & 2) {
+            GosAST* argsList = nodes[1];
+            for (auto* expr : argsList->nodes) {
+                params.push_back(expr->CompileAST(code));
+            }
+        }
+        int id = code.GetTmpVar();
+        vm.WriteCommandNew(nodes[0]->token.str, id, params);
+        return id;
+    }
     return SUB(0);
 }
 
@@ -165,6 +202,16 @@ Compile(Unary) {
             int tmp = code.GetTmpVar();
             vm.WriteCommandClone(tmp, SUB(0));
             vm.WriteCommandNot(tmp);
+            return tmp;
+        } else if (token.type == MUL) {
+            // unbox
+            int tmp = code.GetTmpVar();
+            vm.WriteCommandUnbox(tmp, SUB(0));
+            return tmp;
+        } else if (token.type == ADDR) {
+            // box
+            int tmp = code.GetTmpVar();
+            vm.WriteCommandBox(tmp, SUB(0));
             return tmp;
         }
     }
@@ -371,14 +418,24 @@ Compile(DefVar) {
 }
 
 Compile(Statement) {
+    static std::stack<std::function<void(int)>> loopStart;
+    static std::stack<std::function<void(int)>> loopOut;
     START();
-    int val, startPos;
+    int val, startPos, iterStart;
     std::function<void(int)> ifJmp, endJmp;
     switch (branch) {
-        case 1: case 8: return SUB(0);
+        case 1: case 10: return SUB(0);
         case 7:
             // Return
             vm.WriteCommandRet(SUB(0));
+            return 0;
+        case 8:
+            // Break
+            loopOut.push(vm.WriteCommandJmp());
+            return 0;
+        case 9:
+            // Continue
+            loopStart.push(vm.WriteCommandJmp());
             return 0;
         case 2: case 3:
             // If
@@ -406,6 +463,15 @@ Compile(Statement) {
             vm.WriteCommandJmp()(startPos);
             endJmp(vm.GetProgress());
             code.MoveBack();
+            // Flow Control
+            while (!loopStart.empty()) {
+                loopStart.top()(startPos);
+                loopStart.pop();
+            }
+            while (!loopOut.empty()) {
+                loopOut.top()(vm.GetProgress());
+                loopOut.pop();
+            }
             return 0;
         case 5:
             // For
@@ -421,10 +487,20 @@ Compile(Statement) {
             // statment
             SUB(3);
             // iter
+            iterStart = vm.GetProgress();
             SUB(2);
             vm.WriteCommandJmp()(startPos);
             endJmp(vm.GetProgress());
             code.MoveBack();
+            // Flow Control
+            while (!loopStart.empty()) {
+                loopStart.top()(iterStart);
+                loopStart.pop();
+            }
+            while (!loopOut.empty()) {
+                loopOut.top()(vm.GetProgress());
+                loopOut.pop();
+            }
             return 0;
         case 6:
             // Foreach
@@ -451,6 +527,7 @@ Compile(Statement) {
             // statment
             SUB(2);
             // iter
+            iterStart = vm.GetProgress();
             vm.WriteCommandCall(iter, "__inc", {});
             vm.WriteCommandRef(iter, 0);
             vm.WriteCommandCall(iter, "__indirection", {});
@@ -458,6 +535,15 @@ Compile(Statement) {
             vm.WriteCommandJmp()(startPos);
             endJmp(vm.GetProgress());
             code.MoveBack();
+            // Flow Control
+            while (!loopStart.empty()) {
+                loopStart.top()(iterStart);
+                loopStart.pop();
+            }
+            while (!loopOut.empty()) {
+                loopOut.top()(vm.GetProgress());
+                loopOut.pop();
+            }
             return 0;
     }
     return 0;
@@ -465,8 +551,8 @@ Compile(Statement) {
 
 static inline int blockDepth = 0;
 Compile(StatBlock) {
+    compilingLine = token.line;
     blockDepth++;
-    START();
     for (auto* ast : nodes) {
         ast->CompileAST(code);
     }
@@ -474,15 +560,15 @@ Compile(StatBlock) {
     return 0;
 }
 
-int Gos::Compiler::VMCompiler::lambdaCount = 0;
+static inline int lambdaCount = 0;
 
 Compile(LambdaDef) {
     START();
 
     int start = 0;
     std::stringstream ss;
-    ss << token.line << '_' << (Compiler::VMCompiler::lambdaCount++);
-    std::string lambdaName = "__gos_lambda_" + compilingFileName + "_" + ss.str();
+    ss << compilingFileName << ":" << compilingLine << "_λ#" << (lambdaCount++);
+    std::string lambdaName = ss.str();
     std::vector<std::pair<std::string, int>> captureByValues;
     std::vector<std::string> captureTypeName;
     std::vector<int> capturedID;
@@ -490,10 +576,34 @@ Compile(LambdaDef) {
     std::vector<std::string> argNames;
     std::vector<std::string> ctorTypes;
     if (branch & 1) {
+        std::string errorInfo;
         for (GosAST* ast : nodes[start]->nodes) {
-            captureByValues.push_back({ ast->token.str, code.currentScope->GetVarID(ast->token.str) });
+            int id = code.currentScope->GetVarID(ast->token.str, errorInfo);
+            std::string varType = "";
+            if (errorInfo.size() > 0) {
+                for (int i = 0; i < compilingClassVars.size(); i++) {
+                    if (compilingClassVars[i] == ast->token.str) {
+                        if (compilingClassVarID.find(ast->token.str) != compilingClassVarID.end()) {
+                            id = compilingClassVarID[ast->token.str];
+                        } else {
+                            id = code.GetTmpVar();
+                            vm.WriteCommandGetField(id, 1, ast->token.str);
+                            compilingClassVarID[ast->token.str] = id;
+                        }
+                        varType = compilingClassVarTypes[i];
+                        errorInfo = "";
+                        break;
+                    }
+                }
+                if (errorInfo.size() > 0) {
+                    std::cerr << errorInfo << std::endl;
+                }
+            } else {
+                varType = code.currentScope->GetVarType(ast->token.str);
+            }
+            captureByValues.push_back({ ast->token.str, id });
             capturedID.push_back(captureByValues[captureByValues.size() - 1].second);
-            captureTypeName.push_back(code.currentScope->GetVarType(ast->token.str));
+            captureTypeName.push_back(varType);
         }
         start++;
     }
@@ -585,6 +695,8 @@ Compile(ClassDef) {
     }
     if (branch & 2) {
         // Func
+        code.MoveToNew();
+        compilingClassVarID.clear();
         std::string name = nodes[start++]->token.str;
         std::vector<std::string> argTypes;
         std::vector<std::string> argNames;
@@ -619,11 +731,17 @@ Compile(ClassDef) {
         jmp(vm.GetProgress());
         setMemsize(pc);
         pc = 1;
+        code.MoveBack();
     } else if (branch & 4) {
         // Field
         std::string varName = nodes[start++]->token.str;
         std::string typeName = nodes[start++]->token.str;
+        compilingClassVars.push_back(varName);
+        compilingClassVarTypes.push_back(typeName);
         vm.WriteCommandDefVar(typeName, varName);
+        pc--;
+        code.currentScope->varID.erase(varName);
+        code.currentScope->varType.erase(typeName);
     }
     return 0;
 }
@@ -635,13 +753,24 @@ Compile(IDList) {
 
 Compile(SingleAttr) {
     START();
+    std::string attr = nodes[0]->token.str;
+    std::vector<std::string> attrs;
+    if (nodes.size() > 1) {
+        for (int i = 0; i < nodes[1]->nodes.size(); i++) {
+            attrs.push_back(nodes[1]->nodes[i]->token.str);
+        }
+    }
+    vm.WriteCommandAttributes(attr, attrs);
     return 0;
 }
 
 Compile(Attribute) {
     START();
+    for (int i = 0; i < nodes.size(); i++) {
+        SUB(i);
+    }
     return 0;
-} // TODO
+}
 
 Compile(Preprocess) {
     START();
@@ -656,6 +785,10 @@ Compile(Preprocess) {
             SUB(start++);
         }
         std::string className = nodes[start++]->token.str;
+        compilingClassName = className;
+        compilingClassVars.clear();
+        compilingClassVarTypes.clear();
+        compilingClassVarID.clear();
         std::vector<std::string> inherits;
         if (branch & 4) {
             GosAST* idList = nodes[start++];

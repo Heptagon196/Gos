@@ -1,11 +1,31 @@
-class Lambda {
-    func main() int {
-        var io: IO;
+#import Test.gos
+
+class IO {
+    func __assign(io: IO) void {}
+}
+class Lambda: VC, IO {
+    var io: IO;
+    [HideInInspector(true), Hello(world, is, mine)] func main() int {
+        var arr = new array(10);
+        for (var i = 0; i < 10; i++) {
+            arr[i] = &new Fib(i)();
+        }
+        for (var i = 0; i < 10; i++) {
+            io.print(*arr[i]);
+        }
+        this.Out();
         var i: int = 1;
         var f = lambda [] (x: float) float {
             return x * (x - 1f) / 2f;
         };
-        io.print(f(10f));
+        io.print(f(10.2f));
+        io.print(new Fib(10)());
         return lambda[io](x: int) void { io.print(x); };
+    }
+}
+class VC {
+    var io: IO;
+    func Out() void {
+        io.print("Hello World!");
     }
 }

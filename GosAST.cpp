@@ -91,12 +91,26 @@ namespace Gos { namespace AST {
     Build(Primary) {
         Log(Primary);
         token = tokenizer.GetToken();
+        branch = 0;
         if (token.type == L_ROUND) {
             Expect(Exp);
             tokenizer.EatToken(R_ROUND);
         } else if (token.type == LAMBDA) {
             tokenizer.BackToken();
             Expect(LambdaDef);
+        } else if (token.type == NEW) {
+            branch = 1;
+            Expect(Symbol);
+            if (tokenizer.GetToken().type == L_ROUND) {
+                if (tokenizer.GetToken().type != R_ROUND) {
+                    branch = 3;
+                    tokenizer.BackToken();
+                    Expect(ArgsList);
+                    tokenizer.EatToken(R_ROUND);
+                }
+            } else {
+                tokenizer.BackToken();
+            }
         } else {
             tokenizer.BackToken();
             if (token.type == SYMBOL) {
@@ -159,7 +173,7 @@ namespace Gos { namespace AST {
     Build(Unary) {
         Log(Unary);
         token = tokenizer.GetToken();
-        if (token.type == ADD || token.type == SUB || token.type == NOT) {
+        if (token.type == ADD || token.type == SUB || token.type == NOT || token.type == MUL || token.type == ADDR) {
             branch = 1;
             Expect(Unary);
         } else {
@@ -377,8 +391,14 @@ namespace Gos { namespace AST {
             branch = 7;
             Expect(Exp);
             tokenizer.EatToken(SEM);
-        } else {
+        } else if (token.type == BREAK) {
             branch = 8;
+            tokenizer.EatToken(SEM);
+        } else if (token.type == CONTINUE) {
+            branch = 9;
+            tokenizer.EatToken(SEM);
+        } else {
+            branch = 10;
             tokenizer.BackToken();
             Expect(Exp);
             tokenizer.EatToken(SEM);
@@ -490,6 +510,7 @@ namespace Gos { namespace AST {
             if (token.type != R_ROUND) {
                 tokenizer.BackToken();
                 Expect(IDList);
+                tokenizer.EatToken(R_ROUND);
             }
         } else {
             tokenizer.BackToken();
@@ -510,33 +531,28 @@ namespace Gos { namespace AST {
     Build(Preprocess) {
         Log(Preprocess);
         token = tokenizer.GetToken();
-        if (token.type == IMPORT) {
-            branch = 0;
-            Expect(String);
+        branch = 1;
+        tokenizer.BackToken();
+        if (token.type == L_SQUARE) {
+            branch += 2;
+            Expect(Attribute);
+        }
+        tokenizer.EatToken(CLASS);
+        Expect(Symbol);
+        token = tokenizer.GetToken();
+        if (token.type == COLON) {
+            branch += 4;
+            Expect(IDList);
         } else {
-            branch = 1;
             tokenizer.BackToken();
-            if (token.type == L_SQUARE) {
-                branch += 2;
-                Expect(Attribute);
+        }
+        tokenizer.EatToken(L_CURLY);
+        while (!tokenizer.IsEOF() && (token = tokenizer.GetToken()).type != R_CURLY) {
+            if (gosASTHasError) {
+                return;
             }
-            tokenizer.EatToken(CLASS);
-            Expect(Symbol);
-            token = tokenizer.GetToken();
-            if (token.type == COLON) {
-                branch += 4;
-                Expect(IDList);
-            } else {
-                tokenizer.BackToken();
-            }
-            tokenizer.EatToken(L_CURLY);
-            while (!tokenizer.IsEOF() && (token = tokenizer.GetToken()).type != R_CURLY) {
-                if (gosASTHasError) {
-                    return;
-                }
-                tokenizer.BackToken();
-                Expect(ClassDef);
-            }
+            tokenizer.BackToken();
+            Expect(ClassDef);
         }
     }
 
