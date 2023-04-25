@@ -87,7 +87,7 @@ namespace GosVM {
         bool operator == (const RTConstNum& other) const;
     };
     struct RTConst {
-        std::vector<std::string> strs;
+        std::vector<std::shared_ptr<std::string>> strs;
         std::unordered_map<std::string, int> strMap;
         int getStrID(const std::string& s);
         void setStrID(const std::string& s, int id);

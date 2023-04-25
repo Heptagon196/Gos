@@ -567,7 +567,7 @@ Compile(LambdaDef) {
 
     int start = 0;
     std::stringstream ss;
-    ss << compilingFileName << ":" << compilingLine << "_λ#" << (lambdaCount++);
+    ss << compilingFileName << ":" << compilingLine << "_#" << (lambdaCount++);
     std::string lambdaName = ss.str();
     std::vector<std::pair<std::string, int>> captureByValues;
     std::vector<std::string> captureTypeName;

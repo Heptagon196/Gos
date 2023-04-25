@@ -64,7 +64,7 @@ bool GosVM::RTConstNum::operator == (const RTConstNum& other) const {
 
 int GosVM::RTConst::getStrID(const std::string& s) {
     if (strMap.find(s) == strMap.end()) {
-        strs.push_back(s);
+        strs.push_back(std::make_shared<std::string>(s));
         strMap[s] = strs.size() - 1;
         return strs.size() - 1;
     }
@@ -72,13 +72,14 @@ int GosVM::RTConst::getStrID(const std::string& s) {
 }
 
 void GosVM::RTConst::setStrID(const std::string& s, int id) {
+    auto cont = std::make_shared<std::string>(s);
     if (id < strs.size()) {
-        strs[id] = s;
+        strs[id] = cont;
     } else {
         while (id > strs.size()) {
-            strs.push_back("");
+            strs.push_back(nullptr);
         }
-        strs.push_back(s);
+        strs.push_back(cont);
     }
     strMap[s] = id;
 }
@@ -243,7 +244,7 @@ double& GosVM::VMExecutable::GetParamDouble() {
 }
 
 std::string& GosVM::VMExecutable::GetParamString() {
-    return getConst().strs[GetParamInt()];
+    return *getConst().strs[GetParamInt()];
 }
 
 int& GosVM::VMExecutable::GetParamClass() {
