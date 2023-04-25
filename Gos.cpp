@@ -50,7 +50,7 @@ void Gos::GosScript::PrintIR(std::ostream& fout, bool prettify) {
 }
 
 void Gos::GosProject::PreprocessFile(std::string scriptPath, std::queue<std::string>& imports) {
-    scriptPath = Path(scriptPath).lexically_relative(".");
+    scriptPath = Path(scriptPath).lexically_relative(".").string();
     if (vis.count(scriptPath) > 0) {
         return;
     }
@@ -62,7 +62,7 @@ void Gos::GosProject::PreprocessFile(std::string scriptPath, std::queue<std::str
         if (line.starts_with("#import ")) {
             Path cur = dir;
             cur.append(line.substr(8, line.length() - 8));
-            std::string nxtPath = cur.lexically_relative(".");
+            std::string nxtPath = cur.lexically_relative(".").string();
             PreprocessFile(nxtPath, imports);
         }
     }
@@ -84,8 +84,8 @@ void Gos::GosProject::ExecuteFiles(std::queue<std::string>& files) {
 void Gos::GosProject::ScanDirectory(std::string directory, std::function<bool(std::string)> filter) {
     std::queue<std::string> imports;
     FileSystem::Iterate(".", std::function([&filter, &imports, this](Path path) {
-        if (filter(path)) {
-            PreprocessFile(path, imports);
+        if (filter(path.string())) {
+            PreprocessFile(path.string(), imports);
         }
     }));
     ExecuteFiles(imports);
