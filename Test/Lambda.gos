@@ -5,13 +5,21 @@ class IO {
 }
 class Lambda: VC, IO {
     var io: IO;
-    [HideInInspector(true), Hello(world, is, mine)] func main() int {
+    func mul(a: int, b: any) any {
+        io.print("Hi!");
+        io.print(a);
+        io.print(b);
+        var x = b + a;
+        return x;
+    }
+    [HideInInspector(true)] func main() int {
+        io.print(this.mul(12, 1.1f));
         var arr = new array(10);
         for (var i = 0; i < 10; i++) {
-            arr[i] = &new Fib(i)();
+            arr[i] = new Fib(i)();
         }
         for (var i = 0; i < 10; i++) {
-            io.print(*arr[i]);
+            io.print(*arr[i] * 2);
         }
         this.Out();
         var i: int = 1;

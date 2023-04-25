@@ -20,6 +20,9 @@ struct IO {
     void print(SharedObject i) {
         std::cout << i << std::endl;
     }
+    void print(ReflMgr::Any i) {
+        std::cout << i << std::endl;
+    }
     void read(int& i) {
         std::cin >> i;
     }
@@ -38,32 +41,37 @@ struct IO {
     }
 };
 
+struct unknown {};
+
 struct Array {
     std::vector<SharedObject> cont;
-    SharedObject& operator[] (int idx) {
+    SharedObject& operator [] (int idx) {
         return cont[idx];
     }
 };
-
-struct unknown {};
 
 int IO::i = 10;
 
 void reflIO() {
     ReflMgrTool::Init();
-    ReflMgrTool::AutoRegister<Array>();
     auto& refl = ReflMgr::Instance();
     refl.AddClass<IO>();
     refl.AddClass<unknown>();
-    refl.AddMethod<Array>(std::function([](Array* self, int size) { self->cont.resize(size); }), "__ctor");
+    ReflMgrTool::AutoRegister<Array>();
+    refl.AddClass<Array>();
+    refl.AddMethod<Array>(std::function([](Array* self, int size) -> decltype(auto) {
+        self->cont.resize(size);
+    }), "__ctor");;
+    refl.AddMethod<SharedObject>(std::function([&refl](SharedObject* self, ReflMgr::Any val) -> decltype(auto) {
+        (*self) = refl.New(val.GetType());
+        return self->assign(val);
+    }), "__assign");
+    refl.AddAliasClass("any", TypeID::get<ReflMgr::Any>().getName());
     refl.AddAliasClass("array", "Array");
     refl.AddAliasClass("string", TypeID::get<std::string>().getName());
     refl.AddMethod(std::function([](std::vector<SharedObject>* self, int size) { self->resize(size); }), "resize");
     refl.AddMethod(&IO::count, "count");
-    refl.AddMethod(MethodType<void, IO, float>::Type(&IO::print), "print");
-    refl.AddMethod(MethodType<void, IO, bool>::Type(&IO::print), "print");
-    refl.AddMethod(MethodType<void, IO, std::string>::Type(&IO::print), "print");
-    refl.AddMethod(MethodType<void, IO, SharedObject>::Type(&IO::print), "print");
+    refl.AddMethod(MethodType<void, IO, ReflMgr::Any>::Type(&IO::print), "print");
     refl.AddMethod(MethodType<void, IO, int&>::Type(&IO::read), "read");
     refl.AddMethod(MethodType<void, IO, std::string&>::Type(&IO::read), "read");
     refl.AddMethod(MethodType<void, IO, SharedObject&>::Type(&IO::read), "read");
@@ -97,6 +105,7 @@ int vmTest(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     reflIO();
+    Gos::FileSystem::AddDirectory("Test");
     Gos::GosProject prj;
     // prj.AddScript(name);
     prj.ScanDirectory();

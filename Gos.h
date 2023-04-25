@@ -2,6 +2,7 @@
 
 #include "GosVM.h"
 #include "GosAST.h"
+#include "GosFileSystem.h"
 #include <set>
 
 namespace Gos {
@@ -29,7 +30,7 @@ namespace Gos {
         public:
             void ScanDirectory(std::string directory = ".", std::function<bool(std::string)> filter = std::function(
                 [](std::string fileName) {
-                    return fileName.size() > 4 && fileName.substr(fileName.size() - 4, 4) == ".gos";
+                    return fileName.ends_with(".gos");
                 }));
             void AddScript(std::string scriptPath);
     };

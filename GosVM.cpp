@@ -805,6 +805,9 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                 obj = instance;
             } else {
                 obj = params[b - 1];
+                if (obj.GetType().getHash() == TypeID::get<ReflMgr::Any>().getHash()) {
+                    obj = obj.As<ReflMgr::Any>().ToSharedPtr();
+                }
             }
             memMgr.NewVar(a, obj);
         } else if (op == GET_FIELD) {

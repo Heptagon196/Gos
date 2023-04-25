@@ -1,6 +1,6 @@
 CXX=g++ --std=c++20 -O2
-DEFAULT: Reflection/reflection.o main.o GosVM.o GosAST.o GosASTCompiler.o GosTokenizer.o Gos.o
-	$(CXX) Reflection/reflection.o GosVM.o GosTokenizer.o GosAST.o GosASTCompiler.o Gos.o main.o -o gos
+DEFAULT: Reflection/reflection.o main.o GosVM.o GosAST.o GosASTCompiler.o GosTokenizer.o Gos.o GosFileSystem.o
+	$(CXX) Reflection/reflection.o GosVM.o GosTokenizer.o GosAST.o GosASTCompiler.o Gos.o GosFileSystem.o main.o -o gos
 clean:
 	rm *.o
 Reflection/reflection.o:
@@ -15,5 +15,7 @@ GosASTCompiler.o: GosASTCompiler.cpp
 	$(CXX) -c GosASTCompiler.cpp
 Gos.o: Gos.cpp
 	$(CXX) -c Gos.cpp
+GosFileSystem.o: GosFileSystem.cpp
+	$(CXX) -c GosFileSystem.cpp
 GosTokenizer.o: GosTokenizer.cpp
 	$(CXX) -c GosTokenizer.cpp
