@@ -25,6 +25,8 @@
 
 # Executables
 gos
+.xmake
+build
 *.in
 *.exe
 *.out
