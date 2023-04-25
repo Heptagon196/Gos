@@ -74,7 +74,8 @@ std::string Gos::GosToken::ToString() const {
         return str;
     } else if (type == NUMBER) {
         std::stringstream ss;
-        ss << ((std::string[]){ "i8", "i32", "i64", "float", "double" })[numType] << " ";
+        const char* names[] = { "i8", "i32", "i64", "float", "double" };
+        ss << names[numType] << " ";
         if (numType < 3) {
             ss << num.data.i64;
         } else if (numType == 3) {
