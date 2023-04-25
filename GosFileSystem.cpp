@@ -12,16 +12,16 @@ Gos::FileSystem Gos::FileSystem::instance;
 int Gos::FileSystem::GetFile(Path path, bool init) {
     int cur = 0;
     for (auto& s : path.lexically_relative(".")) {
-        if (instance.structure[cur].find(s) == instance.structure[cur].end()) {
+        if (instance.structure[cur].find(s.string()) == instance.structure[cur].end()) {
             if (!init) {
                 std::cerr << "Error: no such file: " << path << std::endl;
                 return cur;
             } else {
                 instance.files.push_back({ -1, 0, 0, true });
-                instance.structure[cur][s] = instance.files.size() - 1;
+                instance.structure[cur][s.string()] = instance.files.size() - 1;
             }
         }
-        cur = instance.structure[cur][s];
+        cur = instance.structure[cur][s.string()];
     }
     return cur;
 }
@@ -39,7 +39,7 @@ void Gos::FileSystem::AddDirectory(Path dir) {
                 continue;
             }
             auto& s = instance.structure[cur];
-            std::string name = file.path().filename();
+            std::string name = file.path().filename().string();
             if (s.find(name) == s.end()) {
                 instance.files.push_back({ -1, 0, 0 });
                 s[name] = instance.files.size() - 1;
@@ -102,7 +102,7 @@ void Gos::FileSystem::AddPack(Path packPos) {
         getline(fin, tmp);
         size.push_back(s);
     }
-    instance.dataPacks.push_back(packPos);
+    instance.dataPacks.push_back(packPos.string());
     int start = fin.tellg();
     int packID = instance.dataPacks.size() - 1;
     for (int i = 0; i < cnt; i++) {
