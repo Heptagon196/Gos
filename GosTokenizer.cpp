@@ -1,9 +1,10 @@
 #include <sstream>
 #include "GosTokenizer.h"
 
-#define RESERVED_WORD_COUNT 14
+#define RESERVED_WORD_COUNT 15
 
 const std::string Gos::GosToken::TokenName[] = {
+    "using",
     "class",
     "var",
     "func",

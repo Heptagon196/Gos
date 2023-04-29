@@ -742,6 +742,15 @@ Compile(ClassDef) {
         pc--;
         code.currentScope->varID.erase(varName);
         code.currentScope->varType.erase(typeName);
+    } else if (branch & 8) {
+        // using
+        std::string name = nodes[start++]->token.str;
+        compilingClassVars.push_back(name);
+        compilingClassVarTypes.push_back(name);
+        vm.WriteCommandDefVar(name, name);
+        pc--;
+        code.currentScope->varID.erase(name);
+        code.currentScope->varType.erase(name);
     }
     return 0;
 }
@@ -774,32 +783,26 @@ Compile(Attribute) {
 
 Compile(Preprocess) {
     START();
-    if (branch == 0) {
-        int id = pc++;
-        vm.WriteCommandNamespace(nodes[0]->token.str, id);
-        return id;
-    } else {
-        // class def
-        int start = 0;
-        if (branch & 2) {
-            SUB(start++);
-        }
-        std::string className = nodes[start++]->token.str;
-        compilingClassName = className;
-        compilingClassVars.clear();
-        compilingClassVarTypes.clear();
-        compilingClassVarID.clear();
-        std::vector<std::string> inherits;
-        if (branch & 4) {
-            GosAST* idList = nodes[start++];
-            for (GosAST* ast : idList->nodes) {
-                inherits.push_back(ast->token.str);
-            }
-        }
-        vm.WriteCommandDefClass(className, inherits);
-        for (int i = start; i < nodes.size(); i++) {
-            SUB(i);
-        }
-        return 0;
+    // class def
+    int start = 0;
+    if (branch & 2) {
+        SUB(start++);
     }
+    std::string className = nodes[start++]->token.str;
+    compilingClassName = className;
+    compilingClassVars.clear();
+    compilingClassVarTypes.clear();
+    compilingClassVarID.clear();
+    std::vector<std::string> inherits;
+    if (branch & 4) {
+        GosAST* idList = nodes[start++];
+        for (GosAST* ast : idList->nodes) {
+            inherits.push_back(ast->token.str);
+        }
+    }
+    vm.WriteCommandDefClass(className, inherits);
+    for (int i = start; i < nodes.size(); i++) {
+        SUB(i);
+    }
+        return 0;
 }

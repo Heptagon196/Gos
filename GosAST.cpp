@@ -491,6 +491,10 @@ namespace Gos { namespace AST {
             tokenizer.EatToken(COLON);
             Expect(Symbol);
             tokenizer.EatToken(SEM);
+        } else if (token.type == USING) {
+            branch += 8;
+            Expect(Symbol);
+            tokenizer.EatToken(SEM);
         }
     }
     Build(IDList) {

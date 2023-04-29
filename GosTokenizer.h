@@ -5,6 +5,7 @@
 
 namespace Gos {
     enum TokenType {
+        USING,
         CLASS,
         VAR,
         FUNC,
