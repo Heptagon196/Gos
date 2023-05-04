@@ -881,6 +881,9 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                 params.push_back(mem[p]);
             }
             mem[0] = mem[i].Invoke(func, params);
+            if (mem[0].GetType().getHash() == TypeID::get<ReflMgr::Any>().getHash()) {
+                mem[0] = mem[0].As<ReflMgr::Any>().ToSharedPtr();
+            }
         }
     }
     readProgress = progressBackup;

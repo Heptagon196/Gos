@@ -800,6 +800,7 @@ Compile(Preprocess) {
             inherits.push_back(ast->token.str);
         }
     }
+    vm.WriteCommandAttributes("GosInstance", {});
     vm.WriteCommandDefClass(className, inherits);
     auto& mgr = ReflMgr::Instance();
     for (const std::string& cls : inherits) {
