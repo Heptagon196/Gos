@@ -701,7 +701,7 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             TypeID type = ReflMgr::GetType(GetParamString());
             std::string& name = GetParamString();
             clsInfo->vars.push_back({type, name});
-            refl.RawAddField(cls, name, [name](ObjectPtr instance) {
+            refl.RawAddField(cls, type, name, [name](ObjectPtr instance) {
                 return instance.As<GosInstance>().field[name];
             });
             refl.GetFieldTag(cls, name) = currentTag;
@@ -729,7 +729,7 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             std::string& name = GetParamString();
             GosClass::staticVars[cls][name] = refl.New(type);
             SharedObject* obj = &GosClass::staticVars[cls][name];
-            refl.RawAddStaticField(cls, name, [obj]() {
+            refl.RawAddStaticField(cls, type, name, [obj]() {
                 return *obj;
             });
             refl.GetFieldTag(cls, name) = currentTag;

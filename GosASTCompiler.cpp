@@ -801,8 +801,21 @@ Compile(Preprocess) {
         }
     }
     vm.WriteCommandDefClass(className, inherits);
+    auto& mgr = ReflMgr::Instance();
+    for (const std::string& cls : inherits) {
+        mgr.IterateField(TypeID::getRaw(cls), std::function([&](const FieldInfo& field) {
+            std::string varName = field.name;
+            std::string typeName = (std::string)field.varType.getName();
+            compilingClassVars.push_back(varName);
+            compilingClassVarTypes.push_back(typeName);
+            vm.WriteCommandDefVar(typeName, varName);
+            pc--;
+            code.currentScope->varID.erase(varName);
+            code.currentScope->varType.erase(typeName);
+        }));
+    }
     for (int i = start; i < nodes.size(); i++) {
         SUB(i);
     }
-        return 0;
+    return 0;
 }
