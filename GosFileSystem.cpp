@@ -139,7 +139,7 @@ std::stringstream Gos::FileSystem::Read(Path path) {
     File& file = instance.files[FileSystem::GetFile(path, false)];
     if (file.packID == -1) {
         std::ifstream fin;
-        fin.open(path);
+        fin.open(path, std::ios::binary);
         ss << fin.rdbuf();
         fin.close();
     } else {
