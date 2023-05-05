@@ -77,7 +77,7 @@ void Gos::FileSystem::PackDirectory(Path dir, Path saveTo) {
     }
     for (int i = 0; i < files.size(); i++) {
         std::ifstream fin;
-        fin.open(files[i]);
+        fin.open(files[i], std::ios::binary);
         fout << fin.rdbuf();
         fin.close();
     }
