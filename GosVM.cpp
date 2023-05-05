@@ -359,7 +359,6 @@ void GosVM::VMProgram::Read(std::istream& input, bool prettified) {
                 cst->setNumID(num, id);
             } else if (op == NS) {
                 AddParamString(tokenizer.GetToken());
-                AddParamInt(tokenizer.GetToken<int>());
             } else if (op == NEW) {
                 AddParamString(tokenizer.GetToken());
                 AddParamInt(tokenizer.GetToken<int>());
@@ -512,8 +511,7 @@ void GosVM::VMExecutable::Write(std::ostream& out, bool prettified) {
             } else if (op == ALLOC) {
                 out << GetParamInt() << std::endl;
             } else if (op == NS) {
-                out << GetParamString() << ' ';
-                out << GetParamInt() << std::endl;
+                out << GetParamString() << std::endl;
             } else if (op == NEW) {
                 out << GetParamString() << ' ';
                 out << GetParamInt() << ' ';
@@ -756,9 +754,15 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             int size = GetParamInt();
             mem.resize(size);
         } else if (op == NS) {
-            auto& type = GetParamString();
-            int id = GetParamInt();
-            memMgr.NewVar(id, SharedObject{ refl.GetType(type), nullptr });
+            std::string& name = GetParamString();
+            TypeID type = ReflMgr::GetType(name);
+            GosClass::staticVars[cls][name] = SharedObject{ type, nullptr };
+            SharedObject* obj = &GosClass::staticVars[cls][name];
+            refl.RawAddStaticField(cls, type, name, [obj]() {
+                return *obj;
+            });
+            refl.GetFieldTag(cls, name) = currentTag;
+            currentTag = {};
         } else if (op == NEW) {
             auto& type = GetParamString();
             int id = GetParamInt();
@@ -945,10 +949,9 @@ std::function<void(int)> GosVM::VMProgram::WriteCommandDefStaticFunc(const std::
     };
 }
 
-void GosVM::VMProgram::WriteCommandNamespace(const std::string& type, int varID) {
+void GosVM::VMProgram::WriteCommandNamespace(const std::string& type) {
     AddOperation(NS);
     AddParamString(type);
-    AddParamInt(varID);
 }
 
 void GosVM::VMProgram::WriteCommandNew(const std::string& type, int varID, const std::vector<int>& params) {

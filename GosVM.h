@@ -32,7 +32,7 @@ namespace GosVM {
         ALLOC,              // ALLOC [size]
         STR,                // STR [str id] [str len] {str}
         NUM,                // NUM [val id] [int64]
-        NS,                 // NS [type] [var id]
+        NS,                 // NS [type]
         NEW,                // NEW [type] [var id] [param count] {params}
         NEW_STR,            // NEW_STR [var id] [string]
         NEW_NUM,            // NEW_NUM [i8/i32/i64/f/d] [var id] [value]
@@ -164,10 +164,10 @@ namespace GosVM {
             // returns a function to set jump offset
             void WriteCommandDefClass(const std::string& className, const std::vector<std::string>& inherits);
             void WriteCommandDefVar(const std::string& type, const std::string& varName);
+            void WriteCommandNamespace(const std::string& type);
             std::function<void(int)> WriteCommandDefFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
             void WriteCommandDefStaticVar(const std::string& type, const std::string& varName);
             std::function<void(int)> WriteCommandDefStaticFunc(const std::string& name, const std::string& retType, const std::vector<std::string>& paramTypes);
-            void WriteCommandNamespace(const std::string& type, int varID);
             void WriteCommandNew(const std::string& type, int varID, const std::vector<int>& params);
             void WriteCommandNewStr(int varID, const std::string& val);
             void WriteCommandNewNum(int8_t type, int varID, RTConstNum num);

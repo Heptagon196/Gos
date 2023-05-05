@@ -492,7 +492,7 @@ namespace Gos { namespace AST {
             Expect(Symbol);
             tokenizer.EatToken(SEM);
         } else if (token.type == USING) {
-            branch += 8;
+            branch += 16;
             Expect(Symbol);
             tokenizer.EatToken(SEM);
         }

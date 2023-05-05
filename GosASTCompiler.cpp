@@ -742,12 +742,12 @@ Compile(ClassDef) {
         pc--;
         code.currentScope->varID.erase(varName);
         code.currentScope->varType.erase(typeName);
-    } else if (branch & 8) {
+    } else if (branch & 16) {
         // using
         std::string name = nodes[start++]->token.str;
         compilingClassVars.push_back(name);
         compilingClassVarTypes.push_back(name);
-        vm.WriteCommandDefVar(name, name);
+        vm.WriteCommandNamespace(name);
         pc--;
         code.currentScope->varID.erase(name);
         code.currentScope->varType.erase(name);
