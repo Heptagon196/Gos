@@ -88,6 +88,15 @@ Compile(Empty) { return 0; }
 
 Compile(Symbol) { 
     compilingLine = token.line;
+    if (token.str == "true" || token.str == "false") {
+        int num = code.GetTmpVar();
+        int tmp = code.GetTmpVar();
+        GosVM::RTConstNum val;
+        val.data.i32 = token.str == "true" ? 1 : 0;
+        vm.WriteCommandNewNum(1, num, val);
+        vm.WriteCommandNew("bool", tmp, { num });
+        return tmp;
+    }
     std::string errorInfo = "";
     int ret = code.currentScope->GetVarID(token.str, errorInfo);
     if (errorInfo.size() > 0) {
