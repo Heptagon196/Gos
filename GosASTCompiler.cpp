@@ -578,7 +578,8 @@ Compile(LambdaDef) {
     std::stringstream ss;
     ss << compilingFileName << ":" << compilingLine << "_#" << (lambdaCount++);
     std::string lambdaName = ss.str();
-    std::vector<std::pair<std::string, int>> captureByValues;
+    std::vector<std::pair<std::string, int>> captureVarNames;
+    std::vector<int> captureType;
     std::vector<std::string> captureTypeName;
     std::vector<int> capturedID;
     std::vector<std::string> argTypes;
@@ -610,8 +611,9 @@ Compile(LambdaDef) {
             } else {
                 varType = code.currentScope->GetVarType(ast->token.str);
             }
-            captureByValues.push_back({ ast->token.str, id });
-            capturedID.push_back(captureByValues[captureByValues.size() - 1].second);
+            captureVarNames.push_back({ ast->token.str, id });
+            captureType.push_back(ast->branch);
+            capturedID.push_back(captureVarNames[captureVarNames.size() - 1].second);
             captureTypeName.push_back(varType);
         }
         start++;
@@ -629,8 +631,8 @@ Compile(LambdaDef) {
 
     vm.WriteCommandDefClass(lambdaName, {});
 
-    for (int i = 0; i < captureByValues.size(); i++) {
-        vm.WriteCommandDefVar(captureTypeName[i], captureByValues[i].first);
+    for (int i = 0; i < captureVarNames.size(); i++) {
+        vm.WriteCommandDefVar(captureTypeName[i], captureVarNames[i].first);
         ctorTypes.push_back(captureTypeName[i]);
     }
 
@@ -650,11 +652,11 @@ Compile(LambdaDef) {
         code.currentScope->varType[argNames[i]] = argTypes[i];
     }
 
-    for (int i = 0; i < captureByValues.size(); i++) {
+    for (int i = 0; i < captureVarNames.size(); i++) {
         int id = pc++;
-        vm.WriteCommandGetField(id, 1, captureByValues[i].first);
-        code.currentScope->varID[captureByValues[i].first] = id;
-        code.currentScope->varType[captureByValues[i].first] = captureTypeName[i];
+        vm.WriteCommandGetField(id, 1, captureVarNames[i].first);
+        code.currentScope->varID[captureVarNames[i].first] = id;
+        code.currentScope->varType[captureVarNames[i].first] = captureTypeName[i];
     }
 
     SUB(start++);
@@ -672,10 +674,18 @@ Compile(LambdaDef) {
     int tmp = code.GetTmpVar();
     vm.WriteCommandNew(lambdaName, tmp, capturedID);
 
-    for (int i = 0; i < captureByValues.size(); i++) {
+    for (int i = 0; i < captureVarNames.size(); i++) {
         int id = pc++;
-        vm.WriteCommandGetField(id, tmp, captureByValues[i].first);
-        vm.WriteCommandMov(id, captureByValues[i].second);
+        vm.WriteCommandGetField(id, tmp, captureVarNames[i].first);
+        if (captureType[i] == 0) {
+            if (captureTypeName[i] == "unknown") {
+                vm.WriteCommandClone(id, captureVarNames[i].second);
+            } else {
+                vm.WriteCommandMov(id, captureVarNames[i].second);
+            }
+        } else {
+            vm.WriteCommandRef(id, captureVarNames[i].second);
+        }
     }
 
     return tmp;

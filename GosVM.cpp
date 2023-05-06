@@ -650,7 +650,7 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
     auto& cst = getConst();
     curContent = &getContent();
     auto& refl = ReflMgr::Instance();
-    std::string clsName;
+    std::string* clsName;
     TypeID cls = Namespace::Global.Type();
     GosClass* clsInfo = nullptr;
     StartRead();
@@ -665,21 +665,21 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
             }
             currentTag[attr] = attrs;
         } else if (op == DEF_CLASS) {
-            clsName = GetParamString();
+            clsName = &GetParamString();
             int len = GetParamInt();
             std::vector<std::string> inherits;
             while (len--) {
                 inherits.push_back(GetParamString());
             }
-            cls = ReflMgr::GetType(clsName);
+            cls = ReflMgr::GetType(*clsName);
             if (!refl.HasClassInfo(cls)) {
                 if (GosClass::classInfo.find(cls) == GosClass::classInfo.end()) {
-                    GosClass::classInfo[cls] = GosClass(clsName);
+                    GosClass::classInfo[cls] = GosClass(*clsName);
                 }
-                refl.AddVirtualClass(clsName, [clsName](const std::vector<ObjectPtr>& params) {
+                refl.AddVirtualClass(*clsName, [clsName](const std::vector<ObjectPtr>& params) {
                     auto ret = SharedObject::New<GosInstance>();
                     GosInstance& instance = ret.As<GosInstance>();
-                    auto type = ReflMgr::GetType(clsName);
+                    auto type = ReflMgr::GetType(*clsName);
                     GosClass* clsInfo = &GosClass::classInfo[type];
                     instance.info = clsInfo;
                     ret.ForceTypeTo(type);
@@ -691,15 +691,16 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
                 }, currentTag);
                 currentTag = {};
                 for (std::string& s : inherits) {
-                    refl.AddVirtualInheritance(clsName, s);
+                    refl.AddVirtualInheritance(*clsName, s);
                 }
             }
             clsInfo = &GosClass::classInfo[cls];
         } else if (op == DEF_MEMBER_VAR) {
-            TypeID type = ReflMgr::GetType(GetParamString());
+            std::string& typeName = GetParamString();
             std::string& name = GetParamString();
+            TypeID type = ReflMgr::GetType(typeName);
             clsInfo->vars.push_back({type, name});
-            refl.RawAddField(cls, type, name, [name](ObjectPtr instance) {
+            refl.RawAddField(cls, type, name, [&name](ObjectPtr instance) {
                 return instance.As<GosInstance>().field[name];
             });
             refl.GetFieldTag(cls, name) = currentTag;
@@ -818,7 +819,8 @@ SharedObject GosVM::VMExecutable::Execute(ObjectPtr instance, const std::vector<
         } else if (op == GET_FIELD) {
             int a = GetParamInt();
             int b = GetParamInt();
-            mem[a] = mem[b].GetField(GetParamString());
+            std::string& field = GetParamString();
+            mem[a] = mem[b].GetField(field);
         } else if (op == ADD) {
             int a = GetParamInt();
             int b = GetParamInt();

@@ -446,7 +446,26 @@ namespace Gos { namespace AST {
             if (tokenizer.GetToken().type != R_SQUARE) {
                 tokenizer.BackToken();
                 branch += 1;
-                Expect(IDList);
+                nodes.push_back(new Empty());
+                if (tokenizer.GetToken().type == ADDR) {
+                    nodes[0]->Expect(Symbol);
+                    nodes[0]->nodes.back()->branch = 1;
+                } else {
+                    tokenizer.BackToken();
+                    nodes[0]->Expect(Symbol);
+                    nodes[0]->nodes.back()->branch = 0;
+                }
+                while (!tokenizer.IsEOF() && (token = tokenizer.GetToken()).type == COM) {
+                    if (tokenizer.GetToken().type == ADDR) {
+                        nodes[0]->Expect(Symbol);
+                        nodes[0]->nodes.back()->branch = 1;
+                    } else {
+                        tokenizer.BackToken();
+                        nodes[0]->Expect(Symbol);
+                        nodes[0]->nodes.back()->branch = 0;
+                    }
+                }
+                tokenizer.BackToken();
                 tokenizer.EatToken(R_SQUARE);
             }
         } else {
