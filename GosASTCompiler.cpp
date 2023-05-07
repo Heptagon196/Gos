@@ -6,7 +6,7 @@ static inline int compilingLine;
 static inline std::string compilingClassName;
 static inline std::vector<std::string> compilingClassVars;
 static inline std::vector<std::string> compilingClassVarTypes;
-static inline std::unordered_map<std::string, int> compilingClassVarID;
+static inline std::unordered_map<size_t, std::unordered_map<std::string, int>> compilingClassVarID;
 static inline std::vector<std::string> usings;
 
 int Gos::Compiler::Scope::GetVarID(const std::string& name, std::string& errorInfo) {
@@ -72,6 +72,18 @@ Gos::Compiler::VMCompiler::VMCompiler(GosVM::VMProgram& program) : pos(1), vm(pr
     usings.clear();
 }
 
+static inline int& GetFieldCache(Gos::Compiler::Scope* scope, const std::string& name) {
+    for (auto* p = scope; p != nullptr; p = p->fa) {
+        auto& info = compilingClassVarID[(size_t)p];
+        if (info.find(name) != info.end()) {
+            return info[name];
+        }
+    }
+    auto& info =compilingClassVarID[(size_t)scope];
+    info[name] = -1;
+    return info[name];
+}
+
 #define Compile(name) int Gos::AST::name::CompileAST(Gos::Compiler::VMCompiler& code)
 #define SUB(id) nodes[id]->CompileAST(code)
 #define vm code.vm
@@ -88,6 +100,7 @@ Gos::Compiler::VMCompiler::VMCompiler(GosVM::VMProgram& program) : pos(1), vm(pr
 
 Compile(Empty) { return 0; }
 
+
 Compile(Symbol) { 
     compilingLine = token.line;
     if (token.str == "true" || token.str == "false") {
@@ -102,14 +115,15 @@ Compile(Symbol) {
     std::string errorInfo = "";
     int ret = code.currentScope->GetVarID(token.str, errorInfo);
     if (errorInfo.size() > 0) {
-        if (compilingClassVarID.find(token.str) != compilingClassVarID.end()) {
-            return compilingClassVarID[token.str];
+        int& cache = GetFieldCache(code.currentScope, token.str);
+        if (cache != -1) {
+            return cache;
         }
         for (std::string& s : compilingClassVars) {
             if (s == token.str) {
                 int tmp = code.GetTmpVar();
                 vm.WriteCommandGetField(tmp, 1, token.str);
-                compilingClassVarID[token.str] = tmp;
+                cache = tmp;
                 return tmp;
             }
         }
@@ -595,12 +609,13 @@ Compile(LambdaDef) {
             if (errorInfo.size() > 0) {
                 for (int i = 0; i < compilingClassVars.size(); i++) {
                     if (compilingClassVars[i] == ast->token.str) {
-                        if (compilingClassVarID.find(ast->token.str) != compilingClassVarID.end()) {
-                            id = compilingClassVarID[ast->token.str];
+                        int& cache = GetFieldCache(code.currentScope, ast->token.str);
+                        if (cache != -1) {
+                            id = cache;
                         } else {
                             id = code.GetTmpVar();
                             vm.WriteCommandGetField(id, 1, ast->token.str);
-                            compilingClassVarID[ast->token.str] = id;
+                            cache = id;
                         }
                         varType = compilingClassVarTypes[i];
                         errorInfo = "";
@@ -657,8 +672,8 @@ Compile(LambdaDef) {
     for (int i = 0; i < captureVarNames.size(); i++) {
         int id = pc++;
         vm.WriteCommandGetField(id, 1, captureVarNames[i].first);
-        code.funcScope->varID[captureVarNames[i].first] = id;
-        code.funcScope->varType[captureVarNames[i].first] = captureTypeName[i];
+        code.currentScope->varID[captureVarNames[i].first] = id;
+        code.currentScope->varType[captureVarNames[i].first] = captureTypeName[i];
     }
 
     SUB(start++);
