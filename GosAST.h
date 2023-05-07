@@ -23,6 +23,7 @@ namespace Gos {
         struct VMCompiler {
             Scope mainScope;
             Scope* currentScope;
+            Scope* funcScope;
             int pos;
             GosVM::VMProgram& vm;
             std::unordered_map<int, bool> tmpVars;

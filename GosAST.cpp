@@ -554,6 +554,12 @@ namespace Gos { namespace AST {
     Build(Preprocess) {
         Log(Preprocess);
         token = tokenizer.GetToken();
+        if (token.type == USING) {
+            branch = 8;
+            Expect(Symbol);
+            tokenizer.EatToken(SEM);
+            return;
+        }
         branch = 1;
         tokenizer.BackToken();
         if (token.type == L_SQUARE) {

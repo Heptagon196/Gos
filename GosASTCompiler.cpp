@@ -7,6 +7,7 @@ static inline std::string compilingClassName;
 static inline std::vector<std::string> compilingClassVars;
 static inline std::vector<std::string> compilingClassVarTypes;
 static inline std::unordered_map<std::string, int> compilingClassVarID;
+static inline std::vector<std::string> usings;
 
 int Gos::Compiler::Scope::GetVarID(const std::string& name, std::string& errorInfo) {
     if (varID.find(name) != varID.end()) {
@@ -68,6 +69,7 @@ Gos::Compiler::VMCompiler::VMCompiler(GosVM::VMProgram& program) : pos(1), vm(pr
     mainScope.fa = nullptr;
     mainScope.pos = &pos;
     currentScope = &mainScope;
+    usings.clear();
 }
 
 #define Compile(name) int Gos::AST::name::CompileAST(Gos::Compiler::VMCompiler& code)
@@ -655,8 +657,8 @@ Compile(LambdaDef) {
     for (int i = 0; i < captureVarNames.size(); i++) {
         int id = pc++;
         vm.WriteCommandGetField(id, 1, captureVarNames[i].first);
-        code.currentScope->varID[captureVarNames[i].first] = id;
-        code.currentScope->varType[captureVarNames[i].first] = captureTypeName[i];
+        code.funcScope->varID[captureVarNames[i].first] = id;
+        code.funcScope->varType[captureVarNames[i].first] = captureTypeName[i];
     }
 
     SUB(start++);
@@ -715,6 +717,7 @@ Compile(ClassDef) {
     if (branch & 2) {
         // Func
         code.MoveToNew();
+        code.funcScope = code.currentScope;
         compilingClassVarID.clear();
         std::string name = nodes[start++]->token.str;
         std::vector<std::string> argTypes;
@@ -802,6 +805,11 @@ Compile(Attribute) {
 
 Compile(Preprocess) {
     START();
+    // using
+    if (branch & 8) {
+        usings.push_back(nodes[0]->token.str);
+        return 0;
+    }
     // class def
     int start = 0;
     if (branch & 2) {
@@ -821,6 +829,15 @@ Compile(Preprocess) {
     }
     vm.WriteCommandAttributes("GosInstance", {});
     vm.WriteCommandDefClass(className, inherits);
+    for (int i = 0; i < usings.size(); i++) {
+        std::string& name = usings[i];
+        compilingClassVars.push_back(name);
+        compilingClassVarTypes.push_back(name);
+        vm.WriteCommandNamespace(name);
+        pc--;
+        code.currentScope->varID.erase(name);
+        code.currentScope->varType.erase(name);
+    }
     auto& mgr = ReflMgr::Instance();
     for (const std::string& cls : inherits) {
         mgr.IterateField(TypeID::getRaw(cls), std::function([&](const FieldInfo& field) {
