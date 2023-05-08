@@ -103,7 +103,11 @@ void Gos::FileSystem::AddPack(Path packPos) {
         size.push_back(s);
     }
     instance.dataPacks.push_back(packPos.string());
-    int start = fin.tellg();
+#if defined(_MSC_VER)
+    int start = (int)fin.tellg() - cnt * 2 - 1;
+#else
+    int start = (int)fin.tellg();
+#endif
     int packID = instance.dataPacks.size() - 1;
     for (int i = 0; i < cnt; i++) {
         instance.files[GetFile(path[i], true)] = { packID, start, size[i], false };
