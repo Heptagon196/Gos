@@ -19,6 +19,7 @@ namespace Gos {
             std::unordered_map<std::string, std::string> varType;
             int GetVarID(const std::string& name, std::string& errorInfo);
             std::string GetVarType(const std::string& name);
+            std::unordered_map<std::string, int> compilingClassVarID;
         };
         struct VMCompiler {
             Scope mainScope;

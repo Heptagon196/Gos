@@ -6,7 +6,6 @@ static inline int compilingLine;
 static inline std::string compilingClassName;
 static inline std::vector<std::string> compilingClassVars;
 static inline std::vector<std::string> compilingClassVarTypes;
-static inline std::unordered_map<size_t, std::unordered_map<std::string, int>> compilingClassVarID;
 static inline std::vector<std::string> usings;
 
 int Gos::Compiler::Scope::GetVarID(const std::string& name, std::string& errorInfo) {
@@ -35,7 +34,7 @@ std::string Gos::Compiler::Scope::GetVarType(const std::string& name) {
 
 void Gos::Compiler::VMCompiler::MoveToNew() {
     currentScope->subScopes.push_back(Scope());
-    Scope* newScope = &currentScope->subScopes[currentScope->subScopes.size() - 1];
+    Scope* newScope = &currentScope->subScopes.back();
     newScope->pos = currentScope->pos;
     newScope->fa = currentScope;
     currentScope = newScope;
@@ -74,12 +73,12 @@ Gos::Compiler::VMCompiler::VMCompiler(GosVM::VMProgram& program) : pos(1), vm(pr
 
 static inline int& GetFieldCache(Gos::Compiler::Scope* scope, const std::string& name) {
     for (auto* p = scope; p != nullptr; p = p->fa) {
-        auto& info = compilingClassVarID[(size_t)p];
+        auto& info = p->compilingClassVarID;
         if (info.find(name) != info.end()) {
             return info[name];
         }
     }
-    auto& info = compilingClassVarID[(size_t)scope];
+    auto& info = scope->compilingClassVarID;
     info[name] = -1;
     return info[name];
 }
@@ -508,10 +507,10 @@ Compile(Statement) {
             // For
             // init
             SUB(0);
+            code.MoveToNew();
             startPos = vm.GetProgress();
             // while
             val = SUB(1);
-            code.MoveToNew();
             ifJmp = vm.WriteCommandIf(val);
             endJmp = vm.WriteCommandJmp();
             ifJmp(vm.GetProgress());
@@ -739,7 +738,6 @@ Compile(ClassDef) {
         // Func
         code.MoveToNew();
         code.funcScope = code.currentScope;
-        compilingClassVarID.clear();
         std::string name = nodes[start++]->token.str;
         std::vector<std::string> argTypes;
         std::vector<std::string> argNames;
@@ -840,7 +838,6 @@ Compile(Preprocess) {
     compilingClassName = className;
     compilingClassVars.clear();
     compilingClassVarTypes.clear();
-    compilingClassVarID.clear();
     std::vector<std::string> inherits;
     if (branch & 4) {
         GosAST* idList = nodes[start++];
