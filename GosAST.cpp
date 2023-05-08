@@ -393,6 +393,9 @@ namespace Gos { namespace AST {
                 tokenizer.BackToken();
                 Expect(Exp);
                 tokenizer.EatToken(SEM);
+            } else {
+                nodes.push_back(new Empty());
+                nodes[0]->branch = -1;
             }
         } else if (token.type == BREAK) {
             branch = 8;
