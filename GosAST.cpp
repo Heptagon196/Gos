@@ -389,8 +389,11 @@ namespace Gos { namespace AST {
             Expect(StatBlock);
         } else if (token.type == RETURN) {
             branch = 7;
-            Expect(Exp);
-            tokenizer.EatToken(SEM);
+            if (tokenizer.GetToken().type != SEM) {
+                tokenizer.BackToken();
+                Expect(Exp);
+                tokenizer.EatToken(SEM);
+            }
         } else if (token.type == BREAK) {
             branch = 8;
             tokenizer.EatToken(SEM);

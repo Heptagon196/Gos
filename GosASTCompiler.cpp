@@ -452,7 +452,11 @@ Compile(Statement) {
         case 1: case 10: return SUB(0);
         case 7:
             // Return
-            vm.WriteCommandRet(SUB(0));
+            if (nodes.size() > 0) {
+                vm.WriteCommandRet(SUB(0));
+            } else {
+                vm.WriteCommandRet(0);
+            }
             return 0;
         case 8:
             // Break
