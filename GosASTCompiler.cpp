@@ -79,7 +79,7 @@ static inline int& GetFieldCache(Gos::Compiler::Scope* scope, const std::string&
             return info[name];
         }
     }
-    auto& info =compilingClassVarID[(size_t)scope];
+    auto& info = compilingClassVarID[(size_t)scope];
     info[name] = -1;
     return info[name];
 }
@@ -465,16 +465,18 @@ Compile(Statement) {
         case 2: case 3:
             // If
             val = SUB(0);
-            code.MoveToNew();
             ifJmp = vm.WriteCommandIf(val);
             if (branch == 3) {
+                code.MoveToNew();
                 SUB(2);
+                code.MoveBack();
             }
             endJmp = vm.WriteCommandJmp();
             ifJmp(vm.GetProgress());
+            code.MoveToNew();
             SUB(1);
-            endJmp(vm.GetProgress());
             code.MoveBack();
+            endJmp(vm.GetProgress());
             return 0;
         case 4:
             // While
