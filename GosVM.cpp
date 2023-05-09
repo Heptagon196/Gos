@@ -266,8 +266,11 @@ std::string& GosVM::VMFunction::getContent() {
 
 SharedObject GosVM::VMFunction::Execute(ObjectPtr instance, const std::vector<ObjectPtr>& params) {
     RTMemory funcMem;
+    RTMemory* backup = mem;
     mem = &funcMem;
-    return VMExecutable::Execute(instance, params);
+    auto ret = VMExecutable::Execute(instance, params);
+    mem = backup;
+    return ret;
 }
 
 GosVM::RTMemory& GosVM::VMProgram::getMem() {
