@@ -1,5 +1,6 @@
 #include "Gos.h"
 #include "GosTokenizer.h"
+#include <unordered_set>
 
 GosVM::RTConst Gos::GosScript::constArea;
 
@@ -70,8 +71,13 @@ void Gos::GosProject::PreprocessFile(std::string scriptPath, std::queue<std::str
 }
 
 void Gos::GosProject::ExecuteFiles(std::queue<std::string>& files) {
+    std::unordered_set<std::string> vis;
     while (!files.empty()) {
         std::string scriptPath = files.front();
+        if (vis.contains(scriptPath)) {
+            continue;
+        }
+        vis.insert(scriptPath);
         std::cout << "Gos: Import " << scriptPath << std::endl;
         files.pop();
         auto fin = FileSystem::Read(scriptPath);
