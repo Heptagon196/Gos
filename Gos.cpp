@@ -62,7 +62,11 @@ void Gos::GosProject::PreprocessFile(std::string scriptPath, std::queue<std::str
     while (std::getline(fin, line)) {
         if (line.starts_with("#import ")) {
             Path cur = dir;
-            cur.append(line.substr(8, line.length() - 8));
+            int endLen = 8;
+            if (line.ends_with('\r')) {
+                endLen++;
+            }
+            cur.append(line.substr(8, line.length() - endLen));
             std::string nxtPath = cur.lexically_relative(".").string();
             PreprocessFile(nxtPath, imports);
         }
