@@ -70,10 +70,18 @@ void Gos::FileSystem::PackDirectory(Path dir, Path saveTo) {
         files.push_back(path);
     }));
     fout.open(saveTo);
-    fout << files.size() << std::endl;
+    fout << files.size() << '\n';
     for (int i = 0; i < files.size(); i++) {
-        fout << files[i].string() << std::endl;
-        fout << std::filesystem::file_size(files[i]) << std::endl;
+        std::string filename = files[i].string();
+        for (auto ch : filename) {
+            if (ch == '\\') {
+                fout << '/';
+            } else {
+                fout << ch;
+            }
+        }
+        fout << '\n';
+        fout << std::filesystem::file_size(files[i]) << '\n';
     }
     for (int i = 0; i < files.size(); i++) {
         std::ifstream fin;
@@ -149,7 +157,7 @@ std::stringstream Gos::FileSystem::Read(Path path) {
     } else {
         std::ifstream fin;
         char* buffer = new char[file.fileSize];
-        fin.open(instance.dataPacks[file.packID]);
+        fin.open(instance.dataPacks[file.packID], std::ios::binary);
         fin.seekg(file.packPos);
         fin.read(buffer, file.fileSize);
         fin.close();
